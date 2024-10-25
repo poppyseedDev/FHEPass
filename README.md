@@ -18,6 +18,53 @@ A Hardhat-based template for developing Solidity smart contracts, with sensible 
 - [Solcover](https://github.com/sc-forks/solidity-coverage): code coverage
 - [Prettier Plugin Solidity](https://github.com/prettier-solidity/prettier-plugin-solidity): code formatter
 
+sample code:
+```solidity
+contract DID {
+  // core identity data
+  struct Identity {
+    uint256 id;
+    biodata;
+    firstname;
+    lastname;
+    euint64 birthdate;
+  }
+
+  // mapping of address to identity
+  mapping(address => Identity) citizen public;
+
+
+  getCitizen(address wallet) {
+    return citizen[wallet];
+  }
+
+  generateClaim(address claimAddress, string claimFn, string[] fields, address contract) {
+    for(uint i; i < fields.length; i++) {
+      TFHE.allowTransient(citizen[msg.sender][fields[i]], claimAddress);
+    }
+    uint256 citizenId = citizen[msg.sender].id;
+    claimAddress[claimFn](citizenId, contract);
+  }
+}
+
+contract ClaimAdult {
+
+  address didAddress;
+
+  mapping(uint256 => ebool) claimAdult;
+
+  generateAdultClaim(uint id, address contract) {
+    DID(didAddress).citizen(id).birthdate;
+    claimId= keccack256(efefe);
+    claimAdult[claimId] = TFHE.ge(birthdate, 3043953953);
+    TFHE.allow(claimAdult[claimId], address(this));
+    TFHE.allow(claimAdult[claimId], contract);
+    return claimId;
+  }
+}
+```
+
+
 ## Getting Started
 
 Click the [`Use this template`](https://github.com/zama-ai/fhevm-hardhat-template/generate) button at the top of the
