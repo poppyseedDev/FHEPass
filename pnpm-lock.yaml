@@ -5,6 +5,9 @@ settings:
   excludeLinksFromLockfile: false
 
 dependencies:
+  bigint-buffer:
+    specifier: ^1.1.5
+    version: 1.1.5
   extra-bigint:
     specifier: ^1.1.18
     version: 1.2.0
@@ -86,8 +89,8 @@ devDependencies:
     specifier: ^0.5.9
     version: 0.5.9
   fhevmjs:
-    specifier: ^0.5.2
-    version: 0.5.2
+    specifier: ^0.5.7
+    version: 0.5.7
   fs-extra:
     specifier: ^10.1.0
     version: 10.1.0
@@ -1834,7 +1837,6 @@ packages:
     requiresBuild: true
     dependencies:
       bindings: 1.5.0
-    dev: true
 
   /binary-extensions@2.3.0:
     resolution: {integrity: sha512-Ceh+7ox5qe7LJuLHoY0feh3pHuUDHAcRUeyL2VYghZwfpkNIy/+8Ocg0a3UuSoYzavmylwuLWQOf3hl0jjMMIw==}
@@ -2877,8 +2879,8 @@ packages:
       '@openzeppelin/contracts': 5.1.0
     dev: true
 
-  /fhevmjs@0.5.2:
-    resolution: {integrity: sha512-p/p4VTuUUohhGLZ8UgWUnO0rbuw5VummB4fAovUyILeyJ0oBVpGKKwkoaBXNKv40HDo+mvpkDBi6+HdSsMHvNg==}
+  /fhevmjs@0.5.7:
+    resolution: {integrity: sha512-HWVpV0pK4glaTVvSjAvo/FBreI9M+wfmyxau/GVwELuVMCDCChEu/EE8OpnVWt8UhgLtvBrkD5dbhbNYoFjDSQ==}
     engines: {node: '>=20'}
     hasBin: true
     dependencies:

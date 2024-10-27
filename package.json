@@ -34,7 +34,7 @@
     "eslint-config-prettier": "^8.5.0",
     "ethers": "^6.8.0",
     "fhevm": "^0.5.9",
-    "fhevmjs": "^0.5.2",
+    "fhevmjs": "^0.5.7",
     "fs-extra": "^10.1.0",
     "globals": "^15.9.0",
     "hardhat": "^2.22.8",
@@ -102,6 +102,7 @@
     "fhevm:faucet:eve": "docker exec -i zama-dev-fhevm-validator-1 faucet $(npx hardhat task:getEthereumAddressEve)"
   },
   "dependencies": {
+    "bigint-buffer": "^1.1.5",
     "extra-bigint": "^1.1.18",
     "sqlite3": "^5.1.7"
   }

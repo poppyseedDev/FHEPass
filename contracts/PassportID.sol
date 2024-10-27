@@ -6,9 +6,9 @@ import "fhevm/lib/TFHE.sol";
 contract PassportID {
     struct Identity {
         euint64 id; // Encrypted unique ID
-        ebytes256 biodata; // Encrypted biodata (e.g., biometric data or hashed identity data)
-        ebytes256 firstname;
-        ebytes256 lastname;
+        euint8 biodata; // Encrypted biodata (e.g., biometric data or hashed identity data)
+        euint8 firstname;
+        euint8 lastname;
         euint64 birthdate; // Encrypted birthdate for age verification
     }
 
@@ -20,7 +20,13 @@ contract PassportID {
 
     // Register a new identity
     // TODO: Fix problem - one person can register multiple identities; checks if the identity is truthful or unique
-    function registerIdentity(ebytes256 biodata, ebytes256 firstname, ebytes256 lastname, euint64 birthdate) public {
+    function registerIdentity(
+        einput biodata,
+        einput firstname,
+        einput lastname,
+        einput birthdate,
+        bytes calldata inputProof
+    ) public virtual returns (bool) {
         // Ensure uniqueness by checking if the address is already registered
         require(!registered[msg.sender], "Already registered!");
 
@@ -28,15 +34,17 @@ contract PassportID {
         euint64 newId = TFHE.randEuint64(); // Generate a random unique ID
         citizenIdentities[msg.sender] = Identity({
             id: newId,
-            biodata: biodata,
-            firstname: firstname,
-            lastname: lastname,
-            birthdate: birthdate
+            biodata: TFHE.asEuint8(biodata, inputProof),
+            firstname: TFHE.asEuint8(firstname, inputProof),
+            lastname: TFHE.asEuint8(lastname, inputProof),
+            birthdate: TFHE.asEuint64(birthdate, inputProof)
         });
 
         registered[msg.sender] = true;
 
         emit IdentityRegistered(msg.sender);
+
+        return true;
     }
 
     // Function to retrieve encrypted identity data
