@@ -117,10 +117,43 @@ describe("PassportID and ClaimAdult Contracts", function () {
     const identity = await passportContract.getIdentity(this.signers.alice.address);
 
     // // Check if the retrieved data is not null or undefined
-    // expect(identity.biodata).to.not.equal(0);
-    // expect(identity.firstname).to.not.equal(0);
-    // expect(identity.lastname).to.not.equal(0);
-    // expect(identity.birthdate).to.not.equal(0);
+    expect(identity.biodata).to.not.equal(0);
+    expect(identity.firstname).to.not.equal(0);
+    expect(identity.lastname).to.not.equal(0);
+    expect(identity.birthdate).to.not.equal(0);
+
+    // Implement reencryption
+
+    // Implement reencryption for each field
+    const { publicKeyAlice, privateKeyAlice } = this.instances.alice.generateKeypair();
+    const eip712 = this.instances.alice.createEIP712(publicKeyAlice, this.passportIDAddress);
+    const signature = await this.signers.alice.signTypedData(
+      eip712.domain,
+      { Reencrypt: eip712.types.Reencrypt },
+      eip712.message,
+    );
+
+    const reencryptField = async (handle: bigint) => {
+      return this.instances.alice.reencrypt(
+        handle,
+        privateKeyAlice,
+        publicKeyAlice,
+        signature.replace("0x", ""),
+        this.passportIDAddress,
+        this.signers.alice.address,
+      );
+    };
+
+    const reencryptedBiodata = await reencryptField(identity.biodata);
+    // const reencryptedFirstname = await reencryptField(identity.firstname);
+    // const reencryptedLastname = await reencryptField(identity.lastname);
+    // const reencryptedBirthdate = await reencryptField(identity.birthdate);
+
+    // // Verify reencrypted data
+    // expect(reencryptedBiodata).to.equal(8);
+    // expect(reencryptedFirstname).to.equal(8);
+    // expect(reencryptedLastname).to.equal(8);
+    // expect(reencryptedBirthdate).to.equal(1234567890);
   });
 
   //   it("should generate an adult claim", async function () {
