@@ -125,7 +125,7 @@ describe("PassportID and ClaimAdult Contracts", function () {
     // Implement reencryption
 
     // Implement reencryption for each field
-    const { publicKeyAlice, privateKeyAlice } = this.instances.alice.generateKeypair();
+    const { publicKey: publicKeyAlice, privateKey: privateKeyAlice } = this.instances.alice.generateKeypair();
     const eip712 = this.instances.alice.createEIP712(publicKeyAlice, this.passportIDAddress);
     const signature = await this.signers.alice.signTypedData(
       eip712.domain,

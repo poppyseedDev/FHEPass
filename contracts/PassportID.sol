@@ -42,6 +42,12 @@ contract PassportID {
 
         registered[msg.sender] = true;
 
+        TFHE.allow(citizenIdentities[msg.sender].id, msg.sender);
+        TFHE.allow(citizenIdentities[msg.sender].biodata, msg.sender);
+        TFHE.allow(citizenIdentities[msg.sender].firstname, msg.sender);
+        TFHE.allow(citizenIdentities[msg.sender].lastname, msg.sender);
+        TFHE.allow(citizenIdentities[msg.sender].birthdate, msg.sender);
+
         emit IdentityRegistered(msg.sender);
 
         return true;
