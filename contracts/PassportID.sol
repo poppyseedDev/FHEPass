@@ -67,6 +67,12 @@ contract PassportID {
         );
     }
 
+    // Function to retrieve encrypted birthdate
+    function getBirthdate(address user) public view virtual returns (euint64) {
+        require(registered[user], "Identity not registered!");
+        return citizenBirthdates[user];
+    }
+
     // Function to retrieve encrypted firstname
     function getMyIdentityFirstname(address user) public view virtual returns (euint8) {
         require(registered[user], "Identity not registered!");
@@ -74,23 +80,17 @@ contract PassportID {
     }
 
     // Allow transient access to fields for verifiable claims
-    function generateClaim(
-        address claimAddress,
-        string memory claimFn,
-        string[] memory fields,
-        address contractAddr
-    ) public {
-        for (uint i = 0; i < fields.length; i++) {
-            bytes32 fieldHash = keccak256(abi.encodePacked(fields[i]));
-            if (fieldHash == keccak256("birthdate")) {
-                TFHE.allowTransient(citizenBirthdates[msg.sender], claimAddress);
-            } else if (fieldHash == keccak256("biodata")) {
-                TFHE.allowTransient(citizenBiodata[msg.sender], claimAddress);
-            }
-        }
+    function generateClaim(address claimAddress, string memory claimFn) public {
+        // Grant temporary access for citizen's birthdate to be used in the claim generation
+        TFHE.allowTransient(citizenBirthdates[msg.sender], claimAddress);
 
-        euint64 citizenId = citizenIds[msg.sender];
-        (bool success, ) = claimAddress.call(abi.encodeWithSignature(claimFn, citizenId, contractAddr));
-        require(success, "Claim generation failed.");
+        // Ensure the sender can access this citizen's birthdate
+        require(TFHE.isSenderAllowed(citizenBirthdates[msg.sender]), "Access to birthdate not permitted");
+
+        // Attempt the external call and capture the result
+        (bool success, bytes memory data) = claimAddress.call(
+            abi.encodeWithSignature(claimFn, msg.sender, address(this))
+        );
+        require(success, string(abi.encodePacked("Claim generation failed: ", data)));
     }
 }
