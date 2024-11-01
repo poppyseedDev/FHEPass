@@ -18,13 +18,15 @@ contract ClaimAdult {
     // Generate an age claim to verify if a user is above a certain age (e.g., 18)
     function generateAdultClaim(euint64 ageThreshold, address user) public returns (euint64) {
         // Retrieve the user's encrypted birthdate from the PassportID contract
-        PassportID.Identity memory identity = passportContract.getIdentity(user);
+        // PassportID.Identity memory identity = passportContract.getIdentity(user);
+
+        (, , , , euint64 birthdate) = passportContract.getIdentity(user);
 
         // Generate a unique claim ID
         euint64 claimId = TFHE.randEuint64();
 
         // Verify if the user is an adult by checking if birthdate >= threshold
-        ebool isAdult = TFHE.ge(identity.birthdate, ageThreshold);
+        ebool isAdult = TFHE.ge(birthdate, ageThreshold);
 
         // Store the result of the claim
         adultClaims[claimId] = isAdult;

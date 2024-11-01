@@ -4,15 +4,13 @@ pragma solidity ^0.8.19;
 import "fhevm/lib/TFHE.sol";
 
 contract PassportID {
-    struct Identity {
-        euint64 id; // Encrypted unique ID
-        euint8 biodata; // Encrypted biodata (e.g., biometric data or hashed identity data)
-        euint8 firstname;
-        euint8 lastname;
-        euint64 birthdate; // Encrypted birthdate for age verification
-    }
+    // Identity fields stored separately
+    mapping(address => euint64) private citizenIds; // Encrypted unique ID
+    mapping(address => euint8) private citizenBiodata; // Encrypted biodata (e.g., biometric data or hashed identity data)
+    mapping(address => euint8) private citizenFirstnames;
+    mapping(address => euint8) private citizenLastnames;
+    mapping(address => euint64) private citizenBirthdates; // Encrypted birthdate for age verification
 
-    mapping(address => Identity) private citizenIdentities; // Mapping from address to identity
     mapping(address => bool) public registered; // Track if an address is registered
 
     event IdentityRegistered(address indexed user);
@@ -30,23 +28,27 @@ contract PassportID {
         // Ensure uniqueness by checking if the address is already registered
         require(!registered[msg.sender], "Already registered!");
 
-        // Assign a new encrypted identity
+        // Assign new encrypted identity fields
         euint64 newId = TFHE.randEuint64(); // Generate a random unique ID
-        citizenIdentities[msg.sender] = Identity({
-            id: newId,
-            biodata: TFHE.asEuint8(biodata, inputProof),
-            firstname: TFHE.asEuint8(firstname, inputProof),
-            lastname: TFHE.asEuint8(lastname, inputProof),
-            birthdate: TFHE.asEuint64(birthdate, inputProof)
-        });
+        citizenIds[msg.sender] = newId;
+        citizenBiodata[msg.sender] = TFHE.asEuint8(biodata, inputProof);
+        citizenFirstnames[msg.sender] = TFHE.asEuint8(firstname, inputProof);
+        citizenLastnames[msg.sender] = TFHE.asEuint8(lastname, inputProof);
+        citizenBirthdates[msg.sender] = TFHE.asEuint64(birthdate, inputProof);
 
         registered[msg.sender] = true;
 
-        TFHE.allow(citizenIdentities[msg.sender].id, msg.sender);
-        TFHE.allow(citizenIdentities[msg.sender].biodata, msg.sender);
-        TFHE.allow(citizenIdentities[msg.sender].firstname, msg.sender);
-        TFHE.allow(citizenIdentities[msg.sender].lastname, msg.sender);
-        TFHE.allow(citizenIdentities[msg.sender].birthdate, msg.sender);
+        TFHE.allow(citizenIds[msg.sender], msg.sender);
+        TFHE.allow(citizenBiodata[msg.sender], msg.sender);
+        TFHE.allow(citizenFirstnames[msg.sender], msg.sender);
+        TFHE.allow(citizenLastnames[msg.sender], msg.sender);
+        TFHE.allow(citizenBirthdates[msg.sender], msg.sender);
+
+        TFHE.allow(citizenIds[msg.sender], address(this));
+        TFHE.allow(citizenBiodata[msg.sender], address(this));
+        TFHE.allow(citizenFirstnames[msg.sender], address(this));
+        TFHE.allow(citizenLastnames[msg.sender], address(this));
+        TFHE.allow(citizenBirthdates[msg.sender], address(this));
 
         emit IdentityRegistered(msg.sender);
 
@@ -54,9 +56,21 @@ contract PassportID {
     }
 
     // Function to retrieve encrypted identity data
-    function getIdentity(address user) public view returns (Identity memory) {
+    function getIdentity(address user) public view virtual returns (euint64, euint8, euint8, euint8, euint64) {
         require(registered[user], "Identity not registered!");
-        return citizenIdentities[user];
+        return (
+            citizenIds[user],
+            citizenBiodata[user],
+            citizenFirstnames[user],
+            citizenLastnames[user],
+            citizenBirthdates[user]
+        );
+    }
+
+    // Function to retrieve encrypted firstname
+    function getMyIdentityFirstname(address user) public view virtual returns (euint8) {
+        require(registered[user], "Identity not registered!");
+        return citizenFirstnames[user];
     }
 
     // Allow transient access to fields for verifiable claims
@@ -69,13 +83,13 @@ contract PassportID {
         for (uint i = 0; i < fields.length; i++) {
             bytes32 fieldHash = keccak256(abi.encodePacked(fields[i]));
             if (fieldHash == keccak256("birthdate")) {
-                TFHE.allowTransient(citizenIdentities[msg.sender].birthdate, claimAddress);
+                TFHE.allowTransient(citizenBirthdates[msg.sender], claimAddress);
             } else if (fieldHash == keccak256("biodata")) {
-                TFHE.allowTransient(citizenIdentities[msg.sender].biodata, claimAddress);
+                TFHE.allowTransient(citizenBiodata[msg.sender], claimAddress);
             }
         }
 
-        euint64 citizenId = citizenIdentities[msg.sender].id;
+        euint64 citizenId = citizenIds[msg.sender];
         (bool success, ) = claimAddress.call(abi.encodeWithSignature(claimFn, citizenId, contractAddr));
         require(success, "Claim generation failed.");
     }

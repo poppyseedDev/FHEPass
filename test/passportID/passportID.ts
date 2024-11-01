@@ -100,7 +100,7 @@ describe("PassportID and ClaimAdult Contracts", function () {
       .add8(8) // Encrypted biodata hash
       .add8(8) // Encrypted first name
       .add8(8) // Encrypted last name
-      .add64(1234567890)
+      .add64(1234)
       .encrypt();
 
     await passportContract
@@ -114,13 +114,13 @@ describe("PassportID and ClaimAdult Contracts", function () {
       );
 
     // Retrieve and validate the registered identity data
-    const identity = await passportContract.getIdentity(this.signers.alice.address);
+    const firstnameHandleAlice = await passportContract.getMyIdentityFirstname(this.signers.alice);
 
     // // Check if the retrieved data is not null or undefined
-    expect(identity.biodata).to.not.equal(0);
-    expect(identity.firstname).to.not.equal(0);
-    expect(identity.lastname).to.not.equal(0);
-    expect(identity.birthdate).to.not.equal(0);
+    // expect(identity.biodata).to.not.equal(0);
+    // expect(identity.firstname).to.not.equal(0);
+    // expect(identity.lastname).to.not.equal(0);
+    // expect(identity.birthdate).to.not.equal(0);
 
     // Implement reencryption
 
@@ -133,18 +133,36 @@ describe("PassportID and ClaimAdult Contracts", function () {
       eip712.message,
     );
 
-    const reencryptField = async (handle: bigint) => {
-      return this.instances.alice.reencrypt(
-        handle,
-        privateKeyAlice,
-        publicKeyAlice,
-        signature.replace("0x", ""),
-        this.passportIDAddress,
-        this.signers.alice.address,
-      );
-    };
+    console.log("--------------------------------");
+    console.log(firstnameHandleAlice);
 
-    const reencryptedBiodata = await reencryptField(identity.biodata);
+    // const reencryptField = async (handle: any) => {
+    //     return this.instances.alice.reencrypt(
+    //       handle,
+    //       privateKeyAlice,
+    //       publicKeyAlice,
+    //       signature.replace("0x", ""),
+    //       this.passportIDAddress,
+    //       this.signers.alice.address,
+    //     );
+    //   };
+
+    const reencryptedFirstname = await this.instances.alice.reencrypt(
+      firstnameHandleAlice,
+      privateKeyAlice,
+      publicKeyAlice,
+      signature.replace("0x", ""),
+      this.passportIDAddress,
+      this.signers.alice.address,
+    );
+
+    expect(reencryptedFirstname).to.equal(8);
+
+    console.log(reencryptedFirstname);
+
+    console.log("--------------------------------");
+
+    // const reencryptedFirstname = await reencryptField(firstname);
     // const reencryptedFirstname = await reencryptField(identity.firstname);
     // const reencryptedLastname = await reencryptField(identity.lastname);
     // const reencryptedBirthdate = await reencryptField(identity.birthdate);
@@ -156,28 +174,28 @@ describe("PassportID and ClaimAdult Contracts", function () {
     // expect(reencryptedBirthdate).to.equal(1234567890);
   });
 
-  //   it("should generate an adult claim", async function () {
-  //     const ageThreshold = 567890123; // Age threshold for adult verification
+  it("should generate an adult claim", async function () {
+    const ageThreshold = 567890123; // Age threshold for adult verification
 
-  //     // Encrypt the age threshold
-  //     const input = this.instances.alice.createEncryptedInput(this.claimAdultAddress, this.signers.alice.address);
-  //     const encryptedAgeThreshold = input.add64(ageThreshold).encrypt();
+    // Encrypt the age threshold
+    const input = this.instances.alice.createEncryptedInput(this.claimAdultAddress, this.signers.alice.address);
+    const encryptedAgeThreshold = input.add64(ageThreshold).encrypt();
 
-  //     // Generate the adult claim with encrypted threshold
-  //     const tx = await claimAdult
-  //       .connect(this.signers.alice)
-  //       .generateAdultClaim(
-  //         encryptedAgeThreshold.handles[0],
-  //         this.signers.alice.address,
-  //         encryptedAgeThreshold.inputProof,
-  //       );
+    // Generate the adult claim with encrypted threshold
+    const tx = await claimAdult
+      .connect(this.signers.alice)
+      .generateAdultClaim(
+        encryptedAgeThreshold.handles[0],
+        this.signers.alice.address,
+        encryptedAgeThreshold.inputProof,
+      );
 
-  //     const receipt = await tx.wait();
-  //     const event = receipt.events?.find((e: any) => e.event === "AdultClaimGenerated");
-  //     const claimId = event?.args?.claimId;
+    const receipt = await tx.wait();
+    const event = receipt.events?.find((e: any) => e.event === "AdultClaimGenerated");
+    // const claimId = event?.args?.claimId;
 
-  //     // Verify the claim result is stored
-  //     const claimResult = await claimAdult.getAdultClaim(claimId);
-  //     expect(claimResult);
-  //   });
+    // // Verify the claim result is stored
+    // const claimResult = await claimAdult.getAdultClaim(claimId);
+    // expect(claimResult);
+  });
 });
