@@ -192,12 +192,9 @@ describe("PassportID and EmployerClaim Contracts", function () {
 
     await expect(tx).to.emit(employerClaim, "AdultClaimGenerated");
 
-    console.log("--------------------------------");
     // emits don't work, this is how get the latest claim id
     const latestClaimId = await employerClaim.latestClaimId(this.signers.alice.address);
     const adultsClaim = await employerClaim.getAdultClaim(latestClaimId);
-    console.log(adultsClaim);
-    console.log("--------------------------------");
 
     // Implement reencryption for each field
     const { publicKey: publicKeyAlice, privateKey: privateKeyAlice } = this.instances.alice.generateKeypair();

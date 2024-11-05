@@ -57,15 +57,19 @@ contract Diploma {
         require(registered[graduate], "Diploma not registered!");
         return diplomaRecords[graduate].university;
     }
+    function getMyDegree(address graduate) public view virtual returns (euint8) {
+        require(registered[graduate], "Diploma not registered!");
+        return diplomaRecords[graduate].degree;
+    }
 
     function generateClaim(address claimAddress, string memory claimFn) public {
         // Grant temporary access for graduate's data to be used in claim generation
-        TFHE.allowTransient(diplomaRecords[msg.sender].grade, claimAddress);
-        TFHE.allowTransient(diplomaRecords[msg.sender].university, claimAddress);
+        // TFHE.allowTransient(diplomaRecords[msg.sender].grade, claimAddress);
+        // TFHE.allowTransient(diplomaRecords[msg.sender].university, claimAddress);
         TFHE.allowTransient(diplomaRecords[msg.sender].degree, claimAddress);
 
         // Ensure the sender can access this graduate's data
-        require(TFHE.isSenderAllowed(diplomaRecords[msg.sender].grade), "Access to grade not permitted");
+        require(TFHE.isSenderAllowed(diplomaRecords[msg.sender].degree), "Access to degree not permitted");
 
         // Attempt the external call and capture the result
         (bool success, bytes memory data) = claimAddress.call(
