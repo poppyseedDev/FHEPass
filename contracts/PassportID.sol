@@ -20,7 +20,6 @@ contract PassportID {
     event ClaimGenerated(eaddress indexed user, euint64 claimId);
 
     // Register a new identity
-    // TODO: Fix problem - one person can register multiple identities; checks if the identity is truthful or unique
     function registerIdentity(
         einput biodata,
         einput firstname,
@@ -33,11 +32,6 @@ contract PassportID {
 
         // Assign new encrypted identity fields
         euint64 newId = TFHE.randEuint64(); // Generate a random unique ID
-        // citizenIds[msg.sender] = newId;
-        // citizenBiodata[msg.sender] = TFHE.asEuint8(biodata, inputProof);
-        // citizenFirstnames[msg.sender] = TFHE.asEuint8(firstname, inputProof);
-        // citizenLastnames[msg.sender] = TFHE.asEuint8(lastname, inputProof);
-        // citizenBirthdates[msg.sender] = TFHE.asEuint64(birthdate, inputProof);
 
         citizenIdentities[msg.sender] = Identity({
             id: newId,
