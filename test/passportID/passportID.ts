@@ -2,18 +2,18 @@ import { toBufferBE } from "bigint-buffer";
 import { expect } from "chai";
 import { ethers } from "hardhat";
 
-import type { ClaimAdult, PassportID } from "../../types";
+import type { EmployerClaim, PassportID } from "../../types";
 import { createInstances } from "../instance";
 import { getSigners, initSigners } from "../signers";
-import { deployClaimAdultFixture } from "./ClaimAdult.fixture";
+import { deployEmployerClaimFixture } from "./EmployerClaim.fixture";
 
 export const bigIntToBytes256 = (value: bigint) => {
   return new Uint8Array(toBufferBE(value, 256));
 };
 
-describe("PassportID and ClaimAdult Contracts", function () {
+describe("PassportID and EmployerClaim Contracts", function () {
   let passportID: PassportID;
-  let claimAdult: ClaimAdult;
+  let employerClaim: EmployerClaim;
 
   before(async function () {
     await initSigners();
@@ -21,10 +21,10 @@ describe("PassportID and ClaimAdult Contracts", function () {
   });
 
   beforeEach(async function () {
-    const deployment = await deployClaimAdultFixture();
-    claimAdult = deployment.claimAdult;
+    const deployment = await deployEmployerClaimFixture();
+    employerClaim = deployment.employerClaim;
     passportID = deployment.passportID;
-    this.claimAdultAddress = await claimAdult.getAddress();
+    this.employerClaimAddress = await employerClaim.getAddress();
     this.passportIDAddress = await passportID.getAddress();
     this.instances = await createInstances(this.signers);
   });
@@ -188,20 +188,20 @@ describe("PassportID and ClaimAdult Contracts", function () {
     // Generate the adult claim with encrypted threshold
     const tx = await passportContract
       .connect(this.signers.alice)
-      .generateClaim(this.claimAdultAddress, "generateAdultClaim(address,address)");
+      .generateClaim(this.employerClaimAddress, "generateAdultClaim(address,address)");
 
-    await expect(tx).to.emit(claimAdult, "AdultClaimGenerated");
+    await expect(tx).to.emit(employerClaim, "AdultClaimGenerated");
 
     console.log("--------------------------------");
     // emits don't work, this is how get the latest claim id
-    const latestClaimId = await claimAdult.latestClaimId(this.signers.alice.address);
-    const adultsClaim = await claimAdult.getAdultClaim(latestClaimId);
+    const latestClaimId = await employerClaim.latestClaimId(this.signers.alice.address);
+    const adultsClaim = await employerClaim.getAdultClaim(latestClaimId);
     console.log(adultsClaim);
     console.log("--------------------------------");
 
     // Implement reencryption for each field
     const { publicKey: publicKeyAlice, privateKey: privateKeyAlice } = this.instances.alice.generateKeypair();
-    const eip712 = this.instances.alice.createEIP712(publicKeyAlice, this.claimAdultAddress);
+    const eip712 = this.instances.alice.createEIP712(publicKeyAlice, this.employerClaimAddress);
     const signature = await this.signers.alice.signTypedData(
       eip712.domain,
       { Reencrypt: eip712.types.Reencrypt },
@@ -213,7 +213,7 @@ describe("PassportID and ClaimAdult Contracts", function () {
       privateKeyAlice,
       publicKeyAlice,
       signature.replace("0x", ""),
-      this.claimAdultAddress,
+      this.employerClaimAddress,
       this.signers.alice.address,
     );
 

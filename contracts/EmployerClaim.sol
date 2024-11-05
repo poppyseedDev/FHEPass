@@ -4,7 +4,7 @@ pragma solidity ^0.8.19;
 import "fhevm/lib/TFHE.sol";
 import "./PassportID.sol"; // Import PassportID contract
 
-contract ClaimAdult {
+contract EmployerClaim {
     PassportID public passportContract; // Reference to the PassportID contract
 
     mapping(euint64 => ebool) public adultClaims; // Mapping of claim IDs to boolean results

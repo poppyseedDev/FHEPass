@@ -48,18 +48,18 @@ contract DID {
   }
 }
 
-contract ClaimAdult {
+contract EmployerClaim {
 
   address didAddress;
 
-  mapping(uint256 => ebool) claimAdult;
+  mapping(uint256 => ebool) employerClaim;
 
   generateAdultClaim(uint id, address contract) {
     DID(didAddress).citizen(id).birthdate;
     claimId= keccack256(efefe);
-    claimAdult[claimId] = TFHE.ge(birthdate, 3043953953);
-    TFHE.allow(claimAdult[claimId], address(this));
-    TFHE.allow(claimAdult[claimId], contract);
+    employerClaim[claimId] = TFHE.ge(birthdate, 3043953953);
+    TFHE.allow(employerClaim[claimId], address(this));
+    TFHE.allow(employerClaim[claimId], contract);
     return claimId;
   }
 }
