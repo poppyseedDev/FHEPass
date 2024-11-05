@@ -3,19 +3,18 @@ pragma solidity ^0.8.19;
 
 import "fhevm/lib/TFHE.sol";
 import "./PassportID.sol"; // Import PassportID contract
+import "./Diploma.sol";
 
-contract ClaimAdult {
-    PassportID public passportContract; // Reference to the PassportID contract
+contract EmployerClaim {
+    // PassportID public passportContract; // Reference to the PassportID contract
 
     mapping(euint64 => ebool) public adultClaims; // Mapping of claim IDs to boolean results
+    mapping(euint64 => ebool) public degreeClaims; // Add new mapping for degree claims
 
     mapping(address => euint64) public latestClaimId;
 
     event AdultClaimGenerated(euint64 claimId, address user);
-
-    constructor(address _passportAddress) {
-        passportContract = PassportID(_passportAddress); // Initialize the PassportID contract address
-    }
+    event DegreeClaimGenerated(euint64 claimId, address user); // Add new event
 
     // Generate an age claim to verify if a user is above a certain age (e.g., 18)
     function generateAdultClaim(address user, address _passportContract) public returns (euint64) {
@@ -52,5 +51,40 @@ contract ClaimAdult {
     // Retrieve the result of an adult claim using the claim ID
     function getAdultClaim(euint64 claimId) public view returns (ebool) {
         return adultClaims[claimId];
+    }
+
+    // Generate a claim to verify if a user has a specific degree from a specific university
+    function generateDegreeClaim(address user, address _diplomaContract) public returns (euint64) {
+        // Get the diploma data
+        Diploma diploma = Diploma(_diplomaContract);
+        euint8 userUniversity = diploma.getMyDegree(user);
+
+        // Generate a unique claim ID
+        euint64 claimId = TFHE.randEuint64();
+
+        euint8 requiredDegree = TFHE.randEuint8();
+
+        // Check if university and degree match requirements
+        ebool degreeMatch = TFHE.eq(userUniversity, requiredDegree);
+
+        // Store the result of the claim
+        degreeClaims[claimId] = degreeMatch;
+
+        // Grant access to the claim
+        TFHE.allow(degreeMatch, _diplomaContract);
+        TFHE.allow(degreeMatch, address(this));
+        TFHE.allow(degreeMatch, msg.sender);
+        TFHE.allow(degreeMatch, user);
+
+        latestClaimId[user] = claimId;
+
+        emit DegreeClaimGenerated(claimId, user);
+
+        return claimId;
+    }
+
+    // Retrieve the result of a degree claim using the claim ID
+    function getDegreeClaim(euint64 claimId) public view returns (ebool) {
+        return degreeClaims[claimId];
     }
 }
