@@ -115,13 +115,6 @@ describe("PassportID and ClaimAdult Contracts", function () {
 
     // Retrieve and validate the registered identity data
     const firstnameHandleAlice = await passportContract.getMyIdentityFirstname(this.signers.alice);
-
-    // // Check if the retrieved data is not null or undefined
-    // expect(identity.biodata).to.not.equal(0);
-    // expect(identity.firstname).to.not.equal(0);
-    // expect(identity.lastname).to.not.equal(0);
-    // expect(identity.birthdate).to.not.equal(0);
-
     // Implement reencryption
 
     // Implement reencryption for each field
@@ -191,10 +184,6 @@ describe("PassportID and ClaimAdult Contracts", function () {
       );
 
     // const ageThreshold = 25n; // Age threshold for adult verification
-
-    // Encrypt the age threshold
-    // const inputTh = this.instances.alice.createEncryptedInput(this.claimAdultAddress, this.signers.alice.address);
-    // const encryptedAgeThreshold = inputTh.add64(2025).encrypt();
 
     // Generate the adult claim with encrypted threshold
     const tx = await passportContract
