@@ -2,7 +2,7 @@ import { toBufferBE } from "bigint-buffer";
 import { expect } from "chai";
 import { ethers } from "hardhat";
 
-import type { EmployerClaim, PassportID } from "../../types";
+import type { Diploma, EmployerClaim, PassportID } from "../../types";
 import { createInstances } from "../instance";
 import { getSigners, initSigners } from "../signers";
 import { deployEmployerClaimFixture } from "./EmployerClaim.fixture";
@@ -14,6 +14,7 @@ export const bigIntToBytes256 = (value: bigint) => {
 describe("PassportID and EmployerClaim Contracts", function () {
   let passportID: PassportID;
   let employerClaim: EmployerClaim;
+  let diplomaID: Diploma;
 
   before(async function () {
     await initSigners();

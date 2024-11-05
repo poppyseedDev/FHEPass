@@ -1,5 +1,4 @@
 import { expect } from "chai";
-import { ethers } from "hardhat";
 
 import type { IdMapping } from "../../types";
 import { createInstances } from "../instance";

@@ -5,7 +5,7 @@ import "fhevm/lib/TFHE.sol";
 import "./PassportID.sol"; // Import PassportID contract
 
 contract EmployerClaim {
-    PassportID public passportContract; // Reference to the PassportID contract
+    // PassportID public passportContract; // Reference to the PassportID contract
 
     mapping(euint64 => ebool) public adultClaims; // Mapping of claim IDs to boolean results
 
@@ -13,9 +13,9 @@ contract EmployerClaim {
 
     event AdultClaimGenerated(euint64 claimId, address user);
 
-    constructor(address _passportAddress) {
-        passportContract = PassportID(_passportAddress); // Initialize the PassportID contract address
-    }
+    // constructor(address _passportAddress) {
+    //     passportContract = PassportID(_passportAddress); // Initialize the PassportID contract address
+    // }
 
     // Generate an age claim to verify if a user is above a certain age (e.g., 18)
     function generateAdultClaim(address user, address _passportContract) public returns (euint64) {
