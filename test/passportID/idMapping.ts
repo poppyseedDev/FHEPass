@@ -39,4 +39,16 @@ describe("IdMapping Contract", function () {
     expect(await idMapping.getId(this.signers.alice)).to.equal(1);
     expect(await idMapping.getId(this.signers.bob)).to.equal(2);
   });
+
+  it("Should retrieve address for a given ID", async function () {
+    // Generate ID for alice
+    await idMapping.connect(this.signers.alice).generateId();
+
+    // Get alice's address using their ID (1)
+    const retrievedAddress = await idMapping.getAddr(1);
+    expect(retrievedAddress).to.equal(await this.signers.alice.getAddress());
+
+    // Verify getting an invalid ID reverts
+    await expect(idMapping.getAddr(999)).to.be.revertedWith("Invalid ID");
+  });
 });

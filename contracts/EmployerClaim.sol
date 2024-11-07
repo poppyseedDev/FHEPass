@@ -12,9 +12,10 @@ contract EmployerClaim {
     mapping(euint64 => ebool) public degreeClaims; // Add new mapping for degree claims
 
     mapping(address => euint64) public latestClaimId;
+    mapping(uint256 => euint64) public latestClaimUserId;
 
     event AdultClaimGenerated(euint64 claimId, address user);
-    event DegreeClaimGenerated(euint64 claimId, address user); // Add new event
+    event DegreeClaimGenerated(euint64 claimId, uint256 userId); // Add new event
 
     // Generate an age claim to verify if a user is above a certain age (e.g., 18)
     function generateAdultClaim(address user, address _passportContract) public returns (euint64) {
@@ -54,10 +55,10 @@ contract EmployerClaim {
     }
 
     // Generate a claim to verify if a user has a specific degree from a specific university
-    function generateDegreeClaim(address user, address _diplomaContract) public returns (euint64) {
+    function generateDegreeClaim(uint256 userId, address _diplomaContract) public returns (euint64) {
         // Get the diploma data
         Diploma diploma = Diploma(_diplomaContract);
-        euint8 userUniversity = diploma.getMyDegree(user);
+        euint8 userUniversity = diploma.getMyDegree(userId);
 
         // Generate a unique claim ID
         euint64 claimId = TFHE.randEuint64();
@@ -74,11 +75,10 @@ contract EmployerClaim {
         TFHE.allow(degreeMatch, _diplomaContract);
         TFHE.allow(degreeMatch, address(this));
         TFHE.allow(degreeMatch, msg.sender);
-        TFHE.allow(degreeMatch, user);
 
-        latestClaimId[user] = claimId;
+        latestClaimUserId[userId] = claimId;
 
-        emit DegreeClaimGenerated(claimId, user);
+        emit DegreeClaimGenerated(claimId, userId);
 
         return claimId;
     }
