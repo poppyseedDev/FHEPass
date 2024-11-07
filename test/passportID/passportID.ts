@@ -194,7 +194,7 @@ describe("PassportID and EmployerClaim Contracts", function () {
     await expect(tx).to.emit(employerClaim, "AdultClaimGenerated");
 
     // Retrieve the latest claim user ID
-    const latestClaimUserId = await employerClaim.latestClaimUserId(userId);
+    const latestClaimUserId = await employerClaim.lastClaimId();
     const adultsClaim = await employerClaim.getAdultClaim(latestClaimUserId);
 
     // Generate keypair for reencryption
@@ -217,6 +217,6 @@ describe("PassportID and EmployerClaim Contracts", function () {
     );
 
     // Verify the reencrypted adult claim
-    expect(reencryptedFirstname).to.equal(0);
+    expect(reencryptedFirstname).to.equal(1);
   });
 });

@@ -231,7 +231,7 @@ describe("PassportID and EmployerClaim Contracts", function () {
     await expect(tx).to.emit(employerClaim, "DegreeClaimGenerated");
 
     // Retrieve and decrypt claim result
-    const latestClaimUserId = await employerClaim.latestClaimUserId(userId);
+    const latestClaimUserId = await employerClaim.lastClaimId();
     const adultsClaim = await employerClaim.getDegreeClaim(latestClaimUserId);
 
     // Set up secure reencryption for claim verification
@@ -254,5 +254,128 @@ describe("PassportID and EmployerClaim Contracts", function () {
     );
 
     expect(reencryptedFirstname).to.equal(0);
+  });
+
+  /**
+   * Test case: Degree and Adult Claim Generation
+   * Tests the creation and verification of both degree and adult claims based on registered data
+   *
+   * Flow:
+   * 1. Register encrypted diploma credentials
+   * 2. Generate and verify a degree claim
+   * 3. Register encrypted identity
+   * 4. Generate and verify an adult claim
+   */
+  it("should generate both degree and adult claims", async function () {
+    await idMapping.connect(this.signers.alice).generateId();
+    const userId = await idMapping.getId(this.signers.alice);
+
+    // Register encrypted diploma data
+    const diplomaInput = this.instances.alice.createEncryptedInput(this.diplomaAddress, this.signers.alice.address);
+    const diplomaEncryptedData = diplomaInput
+      .add8(8) // University identifier (encrypted)
+      .add8(1) // Degree type (encrypted)
+      .add8(8) // Grade classification (encrypted)
+      .encrypt();
+
+    await diplomaID
+      .connect(this.signers.alice)
+      .registerDiploma(
+        userId,
+        diplomaEncryptedData.handles[0],
+        diplomaEncryptedData.handles[1],
+        diplomaEncryptedData.handles[2],
+        diplomaEncryptedData.inputProof,
+      );
+
+    // Generate degree verification claim
+    const degreeTx = await diplomaID
+      .connect(this.signers.alice)
+      .generateClaim(this.employerClaimAddress, "generateDegreeClaim(uint256,address)");
+
+    await expect(degreeTx).to.emit(employerClaim, "DegreeClaimGenerated");
+
+    // Retrieve and decrypt degree claim result
+    const latestDegreeClaimUserId = await employerClaim.lastClaimId();
+    const degreeClaim = await employerClaim.getDegreeClaim(latestDegreeClaimUserId);
+
+    // Register encrypted identity
+    const identityInput = this.instances.alice.createEncryptedInput(this.passportIDAddress, this.signers.alice.address);
+    const identityEncryptedData = identityInput
+      .add8(8) // Encrypted biodata hash
+      .add8(8) // Encrypted first name
+      .add8(8) // Encrypted last name
+      .add64(1234) // Encrypted birthdate
+      .encrypt();
+
+    await passportID
+      .connect(this.signers.alice)
+      .registerIdentity(
+        userId,
+        identityEncryptedData.handles[0],
+        identityEncryptedData.handles[1],
+        identityEncryptedData.handles[2],
+        identityEncryptedData.handles[3],
+        identityEncryptedData.inputProof,
+      );
+
+    // Generate the adult claim with encrypted threshold
+    const adultTx = await passportID
+      .connect(this.signers.alice)
+      .generateClaim(this.employerClaimAddress, "generateAdultClaim(uint256,address)");
+
+    // Verify that the AdultClaimGenerated event is emitted
+    await expect(adultTx).to.emit(employerClaim, "AdultClaimGenerated");
+
+    // Retrieve the latest adult claim user ID
+    const latestAdultClaimUserId = await employerClaim.lastClaimId();
+    const adultClaim = await employerClaim.getAdultClaim(latestAdultClaimUserId);
+
+    // Generate keypair for reencryption
+    const { publicKey: publicKeyAlice, privateKey: privateKeyAlice } = this.instances.alice.generateKeypair();
+    const eip712 = this.instances.alice.createEIP712(publicKeyAlice, this.employerClaimAddress);
+    const signature = await this.signers.alice.signTypedData(
+      eip712.domain,
+      { Reencrypt: eip712.types.Reencrypt },
+      eip712.message,
+    );
+
+    // Reencrypt and verify both claims
+    const reencryptedDegreeClaim = await this.instances.alice.reencrypt(
+      degreeClaim,
+      privateKeyAlice,
+      publicKeyAlice,
+      signature.replace("0x", ""),
+      this.employerClaimAddress,
+      this.signers.alice.address,
+    );
+
+    const reencryptedAdultClaim = await this.instances.alice.reencrypt(
+      adultClaim,
+      privateKeyAlice,
+      publicKeyAlice,
+      signature.replace("0x", ""),
+      this.employerClaimAddress,
+      this.signers.alice.address,
+    );
+
+    expect(reencryptedDegreeClaim).to.equal(1);
+    expect(reencryptedAdultClaim).to.equal(1);
+
+    // Test for verifyClaims
+    await employerClaim.verifyClaims(userId, latestAdultClaimUserId, latestDegreeClaimUserId);
+    const verifyResult = await employerClaim.getVerifyClaim(userId);
+
+    // Reencrypt and verify the combined claim result
+    const reencryptedVerifyResult = await this.instances.alice.reencrypt(
+      verifyResult,
+      privateKeyAlice,
+      publicKeyAlice,
+      signature.replace("0x", ""),
+      this.employerClaimAddress,
+      this.signers.alice.address,
+    );
+
+    expect(reencryptedVerifyResult).to.equal(1);
   });
 });

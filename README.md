@@ -1,280 +1,165 @@
-# Hardhat Template [![Open in Gitpod][gitpod-badge]][gitpod] [![Github Actions][gha-badge]][gha] [![Hardhat][hardhat-badge]][hardhat] [![License: MIT][license-badge]][license]
+# Decentralized Identity (DID) Contract System
 
-[gitpod]: https://gitpod.io/#https://github.com/zama-ai/fhevm-hardhat-template
-[gitpod-badge]: https://img.shields.io/badge/Gitpod-Open%20in%20Gitpod-FFB45B?logo=gitpod
-[gha]: https://github.com/zama-ai/fhevm-hardhat-template/actions
-[gha-badge]: https://github.com/zama-ai/fhevm-hardhat-template/actions/workflows/ci.yml/badge.svg
-[hardhat]: https://hardhat.org/
-[hardhat-badge]: https://img.shields.io/badge/Built%20with-Hardhat-FFDB1C.svg
-[license]: https://opensource.org/licenses/MIT
-[license-badge]: https://img.shields.io/badge/License-MIT-blue.svg
-testtest
+The DID contract system provides a framework for managing decentralized identities (DIDs) on-chain, using fully homomorphic encryption (FHE) for confidential data. This setup includes tools to create, manage, and verify identity claims securely on the blockchain, leveraging Zama's FHE technology and allowing DIDs to be integrated seamlessly with external contracts, such as employer or credential verification systems.
 
-A Hardhat-based template for developing Solidity smart contracts, with sensible defaults.
+- [fhEVM](https://github.com/zama-ai/fhevm): Enables confidential smart contracts by allowing encrypted data operations directly on-chain.
+- [TFHE Solidity Library](https://github.com/zama-ai/fhevm/blob/main/examples): Provides support for encrypted types and permissions, facilitating privacy-preserving DIDs.
 
-- [Hardhat](https://github.com/nomiclabs/hardhat): compile, run and test smart contracts
-- [TypeChain](https://github.com/ethereum-ts/TypeChain): generate TypeScript bindings for smart contracts
-- [Ethers](https://github.com/ethers-io/ethers.js/): renowned Ethereum library and wallet implementation
-- [Solhint](https://github.com/protofire/solhint): code linter
-- [Solcover](https://github.com/sc-forks/solidity-coverage): code coverage
-- [Prettier Plugin Solidity](https://github.com/prettier-solidity/prettier-plugin-solidity): code formatter
+## Getting Started
 
-sample code:
+To start using the DID system, you’ll need to set up a local environment that includes the `fhEVM` for encrypted smart contracts.
+
+### Prerequisites
+
+1. Install [Docker](https://docs.docker.com/engine/install/)
+2. Install [pnpm](https://pnpm.io/installation)
+3. Use **Node.js v20** or later
+
+Then create a `.env` file to store environment variables (see `.env.example` for an example).
+
+### Setup and Run
+
+1. **Install Dependencies**:
+    ```sh
+    pnpm install
+    ```
+
+2. **Start fhEVM Node**:
+   Set up and run a local `fhEVM` node using Docker to enable encrypted smart contract testing and deployment:
+   ```sh
+   pnpm fhevm:start
+   ```
+   Allow 2–3 minutes for initialization. Monitor logs to confirm the node is ready.
+
+3. **Run Tests**:
+   Open a new terminal and execute:
+   ```sh
+   pnpm test
+   ```
+
+4. **Stop fhEVM Node**:
+   After tests, stop the `fhEVM` node:
+   ```sh
+   pnpm fhevm:stop
+   ```
+
+## Contract Overview
+
+The DID contract manages core identity data and allows the creation of encrypted identity claims for external verification. An example structure for the `DID` and `EmployerClaim` contracts is as follows:
+
+### DID Contract
+
 ```solidity
 contract DID {
-  // core identity data
   struct Identity {
     uint256 id;
-    biodata;
-    firstname;
-    lastname;
-    euint64 birthdate;
+    bytes32 biodata;   // Encrypted bio information
+    string firstname;
+    string lastname;
+    euint64 birthdate; // Encrypted birthdate
   }
 
-  // mapping of address to identity
-  mapping(address => Identity) citizen public;
+  // Maps each address to an Identity
+  mapping(address => Identity) public citizens;
 
-
-  getCitizen(address wallet) {
-    return citizen[wallet];
+  function getCitizen(address wallet) public view returns (Identity memory) {
+    return citizens[wallet];
   }
 
-  generateClaim(address claimAddress, string claimFn, string[] fields, address contract) {
-    for(uint i; i < fields.length; i++) {
-      TFHE.allowTransient(citizen[msg.sender][fields[i]], claimAddress);
+  function generateClaim(address claimAddress, string memory claimFn, string[] memory fields, address contract) public {
+    uint256 citizenId = citizens[msg.sender].id;
+    for (uint i = 0; i < fields.length; i++) {
+      TFHE.allowTransient(citizens[msg.sender][fields[i]], claimAddress);
     }
-    uint256 citizenId = citizen[msg.sender].id;
-    claimAddress[claimFn](citizenId, contract);
+    claimAddress.call(abi.encodeWithSignature(claimFn, citizenId, contract));
   }
 }
+```
 
+### EmployerClaim Contract
+
+```solidity
 contract EmployerClaim {
-
   address didAddress;
 
-  mapping(uint256 => ebool) employerClaim;
+  mapping(uint256 => ebool) public employerClaims;
 
-  generateAdultClaim(uint id, address contract) {
-    DID(didAddress).citizen(id).birthdate;
-    claimId= keccack256(efefe);
-    employerClaim[claimId] = TFHE.ge(birthdate, 3043953953);
-    TFHE.allow(employerClaim[claimId], address(this));
-    TFHE.allow(employerClaim[claimId], contract);
+  function generateAdultClaim(uint id, address contract) public returns (bytes32) {
+    euint64 birthdate = DID(didAddress).getCitizen(id).birthdate;
+    bytes32 claimId = keccak256("age_check");
+    employerClaims[claimId] = TFHE.ge(birthdate, 18); // Check if birthdate meets age threshold
+    TFHE.allow(employerClaims[claimId], contract);
     return claimId;
   }
 }
 ```
 
-
-## Getting Started
-
-Click the [`Use this template`](https://github.com/zama-ai/fhevm-hardhat-template/generate) button at the top of the
-page to create a new repository with this repo as the initial state.
-
 ## Features
 
-This template builds upon the frameworks and libraries mentioned above, so for details about their specific features,
-please consult their respective documentations.
+### Identity and Claim Management
+- **Identity Creation**: Each DID is created and managed in the `DID` contract, linking an `Identity` struct to an address.
+- **Encrypted Claims**: Using FHE, claims are generated and stored as encrypted data, protecting sensitive identity information.
 
-For example, for Hardhat, you can refer to the [Hardhat Tutorial](https://hardhat.org/tutorial) and the
-[Hardhat Docs](https://hardhat.org/docs). You might be in particular interested in reading the
-[Testing Contracts](https://hardhat.org/tutorial/testing-contracts) section.
-
-### Sensible Defaults
-
-This template comes with sensible default configurations in the following files:
-
-```text
-├── .editorconfig
-├── .eslintignore
-├── .eslintrc.yml
-├── .gitignore
-├── .prettierignore
-├── .prettierrc.yml
-├── .solcover.js
-├── .solhint.json
-└── hardhat.config.ts
-```
-
-### VSCode Integration
-
-This template is IDE agnostic, but for the best user experience, you may want to use it in VSCode alongside Nomic
-Foundation's [Solidity extension](https://marketplace.visualstudio.com/items?itemName=NomicFoundation.hardhat-solidity).
-
-### GitHub Actions
-
-This template comes with GitHub Actions pre-configured. Your contracts will be linted and tested on every push and pull
-request made to the `main` branch.
-
-Note though that to make this work, you must use your `INFURA_API_KEY` and your `MNEMONIC` as GitHub secrets.
-
-You can edit the CI script in [.github/workflows/ci.yml](./.github/workflows/ci.yml).
+### Access Control with Transient Permissions
+- **Claim Generation**: Allows external contracts to verify claims, with permissions granted for each field temporarily.
+- **Employer Claims**: Employers can verify specific claims (e.g., age) without accessing sensitive data directly.
 
 ## Usage
 
-### Pre Requisites
-
-Install [docker](https://docs.docker.com/engine/install/)
-
-Install [pnpm](https://pnpm.io/installation)
-
-Before being able to run any command, you need to create a `.env` file and set a BIP-39 compatible mnemonic as an
-environment variable. You can follow the example in `.env.example` and start with the following command:
-
-```sh
-cp .env.example .env
-```
-
-If you don't already have a mnemonic, you can use this [website](https://iancoleman.io/bip39/) to generate one.
-
-Then, proceed with installing dependencies - please **_make sure to use Node v20_** or more recent or this will fail:
-
-```sh
-pnpm install
-```
-
-### Start fhEVM
-
-During installation (see previous section) we recommend you for easier setup to not change the default `.env` : simply
-copy the original `.env.example` file to a new `.env` file in the root of the repo.
-
-Then, start a local fhEVM docker compose that inlcudes everything needed to deploy FHE encrypted smart contracts using:
-
-```sh
-# In one terminal, keep it opened
-# The node logs are printed
-pnpm fhevm:start
-```
-
-Previous command will take 2 to 3 minutes to do the whole initial setup - wait until the blockchain logs appear to make
-sure setup is complete (we are working on making initial deployment faster).
-
-You can then run the tests simply in a new terminal via :
-
-```
-pnpm test
-```
-
-Once your done with your tests, to stop the node:
-
-```sh
-pnpm fhevm:stop
-```
-
-### Compile
-
-Compile the smart contracts with Hardhat:
+### Compile Contracts
 
 ```sh
 pnpm compile
 ```
 
-### TypeChain
+### TypeChain Bindings
 
-Compile the smart contracts and generate TypeChain bindings:
+Generate TypeChain bindings for TypeScript:
 
 ```sh
 pnpm typechain
 ```
 
-### List accounts
+### Run Tests
 
-From the mnemonic in .env file, list all the derived Ethereum adresses:
-
-```sh
-pnpm task:accounts
-```
-
-### Get some native coins
-
-In order to interact with the blockchain, one need some coins. This command will give coins to the first 5 addresses
-derived from the mnemonic in .env file.
-
-```sh
-pnpm fhevm:faucet
-```
-
-<br />
-<details>
-  <summary>To get the first derived address from mnemonic</summary>
-<br />
-
-```sh
-pnpm task:getEthereumAddress
-```
-
-</details>
-<br />
-
-### Test
-
-Run the tests with Hardhat:
+Run tests to verify contract functionality:
 
 ```sh
 pnpm test
 ```
 
-### Lint Solidity
+### Additional Commands
 
-Lint the Solidity code:
-
-```sh
-pnpm lint:sol
-```
-
-### Lint TypeScript
-
-Lint the TypeScript code:
+**List Accounts**:
 
 ```sh
-pnpm lint:ts
+pnpm task:accounts
 ```
 
-### Report Gas
-
-See the gas usage per unit test and average gas per method call:
+**Get Native Tokens**:
 
 ```sh
-REPORT_GAS=true pnpm test
+pnpm fhevm:faucet
 ```
 
-### Clean
+## Mocked Mode for Testing
 
-Delete the smart contract artifacts, the coverage reports and the Hardhat cache:
+The mocked mode provides a faster way to test and analyze code coverage. In this mode, encryption is disabled, enabling local testing without the need for actual encryption on `fhEVM`.
 
 ```sh
-pnpm clean
-```
-
-### Mocked mode
-
-The mocked mode allows faster testing and the ability to analyze coverage of the tests. In this mocked version,
-encrypted types are not really encrypted, and the tests are run on the original version of the EVM, on a local hardhat
-network instance. To run the tests in mocked mode, you can use directly the following command:
-
-```bash
 pnpm test:mock
 ```
 
-To analyze the coverage of the tests (in mocked mode necessarily, as this cannot be done on the real fhEVM node), you
-can use this command :
+For code coverage:
 
-```bash
+```sh
 pnpm coverage:mock
 ```
 
-Then open the file `coverage/index.html`. You can see there which line or branch for each contract which has been
-covered or missed by your test suite. This allows increased security by pointing out missing branches not covered yet by
-the current tests.
+## Syntax Highlighting
 
-> [!Note]
-> Due to intrinsic limitations of the original EVM, the mocked version differ in few corner cases from the real fhEVM, the main difference is the difference in gas prices for the FHE operations. This means that before deploying to production, developers still need to run the tests with the original fhEVM node, as a final check in non-mocked mode, with `pnpm test`.
-
-### Syntax Highlighting
-
-If you use VSCode, you can get Solidity syntax highlighting with the
-[hardhat-solidity](https://marketplace.visualstudio.com/items?itemName=NomicFoundation.hardhat-solidity) extension.
+For VSCode users, [Solidity syntax highlighting](https://marketplace.visualstudio.com/items?itemName=NomicFoundation.hardhat-solidity) is recommended.
 
 ## License
 
-This project is licensed under MIT.
+This project is licensed under the MIT License.
