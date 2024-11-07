@@ -133,9 +133,7 @@ contract Diploma {
         require(TFHE.isSenderAllowed(diplomaRecords[userId].degree), "Access to degree not permitted");
 
         // Attempt the external call and capture the result
-        (bool success, bytes memory data) = claimAddress.call(
-            abi.encodeWithSignature(claimFn, msg.sender, address(this))
-        );
+        (bool success, bytes memory data) = claimAddress.call(abi.encodeWithSignature(claimFn, userId, address(this)));
         require(success, string(abi.encodePacked("Claim generation failed: ", data)));
 
         emit ClaimGenerated(msg.sender, claimAddress, claimFn);

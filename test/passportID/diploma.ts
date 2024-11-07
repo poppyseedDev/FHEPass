@@ -1,6 +1,5 @@
 import { toBufferBE } from "bigint-buffer";
 import { expect } from "chai";
-import { ethers } from "hardhat";
 
 import type { Diploma, EmployerClaim, IdMapping, PassportID } from "../../types";
 import { createInstances } from "../instance";

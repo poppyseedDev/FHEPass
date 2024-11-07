@@ -6,8 +6,6 @@ import "./PassportID.sol"; // Import PassportID contract
 import "./Diploma.sol";
 
 contract EmployerClaim {
-    // PassportID public passportContract; // Reference to the PassportID contract
-
     mapping(euint64 => ebool) public adultClaims; // Mapping of claim IDs to boolean results
     mapping(euint64 => ebool) public degreeClaims; // Add new mapping for degree claims
 
@@ -16,6 +14,14 @@ contract EmployerClaim {
 
     event AdultClaimGenerated(euint64 claimId, address user);
     event DegreeClaimGenerated(euint64 claimId, uint256 userId); // Add new event
+
+    IdMapping private idMapping;
+    address public owner;
+
+    constructor(address _idMappingAddress) {
+        idMapping = IdMapping(_idMappingAddress);
+        owner = msg.sender;
+    }
 
     // Generate an age claim to verify if a user is above a certain age (e.g., 18)
     function generateAdultClaim(address user, address _passportContract) public returns (euint64) {
@@ -71,10 +77,11 @@ contract EmployerClaim {
         // Store the result of the claim
         degreeClaims[claimId] = degreeMatch;
 
+        address addressToBeAllowed = idMapping.getAddr(userId);
+
         // Grant access to the claim
-        TFHE.allow(degreeMatch, _diplomaContract);
         TFHE.allow(degreeMatch, address(this));
-        TFHE.allow(degreeMatch, msg.sender);
+        TFHE.allow(degreeMatch, addressToBeAllowed);
 
         latestClaimUserId[userId] = claimId;
 
