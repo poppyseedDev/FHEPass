@@ -3,7 +3,7 @@ import { expect } from "chai";
 import type { IdMapping } from "../../types";
 import { createInstances } from "../instance";
 import { getSigners, initSigners } from "../signers";
-import { deployIdMappingFixture } from "./IdMapping.fixture";
+import { deployIdMappingFixture } from "./fixture/IdMapping.fixture";
 
 describe("IdMapping Contract", function () {
   let idMapping: IdMapping;

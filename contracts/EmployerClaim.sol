@@ -9,10 +9,9 @@ contract EmployerClaim {
     mapping(euint64 => ebool) public adultClaims; // Mapping of claim IDs to boolean results
     mapping(euint64 => ebool) public degreeClaims; // Add new mapping for degree claims
 
-    mapping(address => euint64) public latestClaimId;
     mapping(uint256 => euint64) public latestClaimUserId;
 
-    event AdultClaimGenerated(euint64 claimId, address user);
+    event AdultClaimGenerated(euint64 claimId, uint256 userId);
     event DegreeClaimGenerated(euint64 claimId, uint256 userId); // Add new event
 
     IdMapping private idMapping;
@@ -24,10 +23,10 @@ contract EmployerClaim {
     }
 
     // Generate an age claim to verify if a user is above a certain age (e.g., 18)
-    function generateAdultClaim(address user, address _passportContract) public returns (euint64) {
+    function generateAdultClaim(uint256 userId, address _passportContract) public returns (euint64) {
         // Retrieve the user's encrypted birthdate from the PassportID contract
         PassportID passport = PassportID(_passportContract);
-        euint64 birthdate = passport.getBirthdate(user);
+        euint64 birthdate = passport.getBirthdate(userId);
 
         // // Set age threshold to 18 years (in Unix timestamp)
         euint64 ageThreshold = TFHE.asEuint64(1704067200); // Jan 1, 2024 - 18 years
@@ -41,16 +40,17 @@ contract EmployerClaim {
         // // Store the result of the claim
         adultClaims[claimId] = isAdult;
 
+        address addressToBeAllowed = idMapping.getAddr(userId);
+
         // // Grant access to the claim to both the contract and user for verification purposes
         TFHE.allow(isAdult, _passportContract);
         TFHE.allow(isAdult, address(this));
-        TFHE.allow(isAdult, msg.sender);
-        TFHE.allow(isAdult, user);
+        TFHE.allow(isAdult, addressToBeAllowed);
 
-        latestClaimId[user] = claimId; // Store claimId for the user
+        latestClaimUserId[userId] = claimId;
 
         // // Emit an event for the generated claim
-        emit AdultClaimGenerated(claimId, user);
+        emit AdultClaimGenerated(claimId, userId);
 
         return claimId;
     }

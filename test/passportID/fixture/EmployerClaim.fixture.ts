@@ -1,7 +1,8 @@
 import { ethers } from "hardhat";
 
-import type { Diploma, EmployerClaim, IdMapping, PassportID } from "../../types";
+import type { Diploma, EmployerClaim, IdMapping, PassportID } from "../../../types";
 import { deployDiplomaFixture } from "./Diploma.fixture";
+import { deployIdMappingFixture } from "./IdMapping.fixture";
 import { deployPassportIDFixture } from "./PassportID.fixture";
 
 export async function deployEmployerClaimFixture(): Promise<{
@@ -10,8 +11,9 @@ export async function deployEmployerClaimFixture(): Promise<{
   diploma: Diploma;
   idMapping: IdMapping;
 }> {
-  const passportID = await deployPassportIDFixture();
-  const { diploma, idMapping } = await deployDiplomaFixture();
+  const idMapping = await deployIdMappingFixture();
+  const passportID = await deployPassportIDFixture(idMapping);
+  const diploma = await deployDiplomaFixture(idMapping);
   const EmployerClaimFactory = await ethers.getContractFactory("EmployerClaim");
   const employerClaim = await EmployerClaimFactory.deploy(idMapping);
   await employerClaim.waitForDeployment();
