@@ -5,10 +5,12 @@ import "fhevm/lib/TFHE.sol";
 import "./IdMapping.sol";
 
 contract Diploma {
-    // Add role for diploma registrars
+    // Mapping to store addresses with registrar role
     mapping(address => bool) public registrars;
+    // Address of the contract owner
     address public owner;
 
+    // Structure to hold encrypted diploma data
     struct DiplomaData {
         euint64 id; // Encrypted unique diploma ID
         euint8 university; // Encrypted university identifier
@@ -16,47 +18,57 @@ contract Diploma {
         euint8 grade; // Encrypted grade
     }
 
+    // Instance of IdMapping contract
     IdMapping private idMapping;
 
+    // Mapping to store diploma records by user ID
     mapping(uint256 => DiplomaData) private diplomaRecords;
+    // Mapping to track registered diplomas
     mapping(uint256 => bool) public registered;
 
+    // Event emitted when a diploma is registered
     event DiplomaRegistered(address indexed graduate);
+    // Event emitted when a claim is generated
     event ClaimGenerated(address indexed graduate, address claimAddress, string claimFn);
+    // Event emitted when a registrar is added
     event RegistrarAdded(address indexed registrar);
+    // Event emitted when a registrar is removed
     event RegistrarRemoved(address indexed registrar);
 
+    // Constructor to initialize the contract with IdMapping address
     constructor(address _idMappingAddress) {
         idMapping = IdMapping(_idMappingAddress);
         owner = msg.sender;
-        registrars[msg.sender] = true;
+        registrars[msg.sender] = true; // Assign owner as a registrar
     }
 
-    // Modifier for registrar access - everyone at the university who has a right to make changes to the diploma
+    // Modifier to restrict access to registrars
     modifier onlyRegistrar() {
         require(registrars[msg.sender], "Only registrars can perform this action");
         _;
     }
 
+    // Modifier to restrict access to the contract owner
     modifier onlyOwner() {
         require(msg.sender == owner, "Only owner can perform this action");
         _;
     }
 
-    // Add registrar management
+    // Function to add a new registrar, only callable by the owner
     function addRegistrar(address registrar) external onlyOwner {
         require(registrar != address(0), "Invalid registrar address");
         registrars[registrar] = true;
         emit RegistrarAdded(registrar);
     }
 
+    // Function to remove a registrar, only callable by the owner
     function removeRegistrar(address registrar) external onlyOwner {
         require(registrar != owner, "Cannot remove owner as registrar");
         registrars[registrar] = false;
         emit RegistrarRemoved(registrar);
     }
 
-    // only registrar can submit a diploma for specific id
+    // Function to register a diploma, only callable by a registrar
     function registerDiploma(
         uint256 userId,
         einput university,
@@ -65,11 +77,12 @@ contract Diploma {
         bytes calldata inputProof
     ) public virtual onlyRegistrar returns (bool) {
         require(userId != 0, "ID not generated. Please call generateId first.");
-
         require(!registered[userId], "Diploma already registered!");
 
+        // Generate a new encrypted diploma ID
         euint64 newId = TFHE.randEuint64();
 
+        // Store the encrypted diploma data
         diplomaRecords[userId] = DiplomaData({
             id: newId,
             university: TFHE.asEuint8(university, inputProof),
@@ -77,8 +90,9 @@ contract Diploma {
             grade: TFHE.asEuint8(grade, inputProof)
         });
 
-        registered[userId] = true;
+        registered[userId] = true; // Mark the diploma as registered
 
+        // Get the address associated with the user ID
         address addressToBeAllowed = idMapping.getAddr(userId);
 
         // Allow the graduate to access their own data
@@ -93,34 +107,37 @@ contract Diploma {
         TFHE.allow(diplomaRecords[userId].degree, address(this));
         TFHE.allow(diplomaRecords[userId].grade, address(this));
 
-        emit DiplomaRegistered(addressToBeAllowed);
+        emit DiplomaRegistered(addressToBeAllowed); // Emit event for diploma registration
 
         return true;
     }
 
+    // Function to get the encrypted university identifier for a user
     function getMyUniversity(uint256 userId) public view returns (euint8) {
         require(registered[userId], "Diploma not registered!");
         return diplomaRecords[userId].university;
     }
 
+    // Function to get the encrypted degree type for a user
     function getMyDegree(uint256 userId) public view virtual returns (euint8) {
         require(registered[userId], "Diploma not registered!");
         return diplomaRecords[userId].degree;
     }
 
-    // grade getter
+    // Function to get the encrypted grade for a user
     function getMyGrade(uint256 userId) public view virtual returns (euint8) {
         require(registered[userId], "Diploma not registered!");
         return diplomaRecords[userId].grade;
     }
 
-    // Diploma existence check
+    // Function to check if a diploma is registered for a user
     function hasDiploma(uint256 userId) public view returns (bool) {
         return registered[userId];
     }
 
+    // Function to generate a claim for a diploma
     function generateClaim(address claimAddress, string memory claimFn) public {
-        // only the msg.sender that is registered under the user id can make the claim
+        // Only the msg.sender that is registered under the user ID can make the claim
         uint256 userId = idMapping.getId(msg.sender);
         require(userId != 0, "ID not generated. Please call generateId first.");
 
@@ -136,6 +153,6 @@ contract Diploma {
         (bool success, bytes memory data) = claimAddress.call(abi.encodeWithSignature(claimFn, userId, address(this)));
         require(success, string(abi.encodePacked("Claim generation failed: ", data)));
 
-        emit ClaimGenerated(msg.sender, claimAddress, claimFn);
+        emit ClaimGenerated(msg.sender, claimAddress, claimFn); // Emit event for claim generation
     }
 }
