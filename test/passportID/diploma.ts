@@ -7,20 +7,32 @@ import { createInstances } from "../instance";
 import { getSigners, initSigners } from "../signers";
 import { deployEmployerClaimFixture } from "./EmployerClaim.fixture";
 
+/**
+ * Converts a bigint value to a 256-bit byte array
+ */
 export const bigIntToBytes256 = (value: bigint) => {
   return new Uint8Array(toBufferBE(value, 256));
 };
 
+/**
+ * Test suite for PassportID and EmployerClaim contract integration
+ */
 describe("PassportID and EmployerClaim Contracts", function () {
   let passportID: PassportID;
   let employerClaim: EmployerClaim;
   let diplomaID: Diploma;
 
+  /**
+   * Initialize signers before all tests
+   */
   before(async function () {
     await initSigners();
     this.signers = await getSigners();
   });
 
+  /**
+   * Deploy fresh contracts and set up test environment before each test
+   */
   beforeEach(async function () {
     const deployment = await deployEmployerClaimFixture();
     employerClaim = deployment.employerClaim;
@@ -32,6 +44,13 @@ describe("PassportID and EmployerClaim Contracts", function () {
     this.instances = await createInstances(this.signers);
   });
 
+  /**
+   * Test case: Verifies that a user can successfully register their diploma identity
+   * Steps:
+   * 1. Create encrypted inputs for university, degree and grade
+   * 2. Register the diploma with encrypted data
+   * 3. Verify registration status
+   */
   it("should register an identity successfully", async function () {
     // const diplomaIdContract = await ethers.getContractAt("Diploma", diplomaID);
 
@@ -61,6 +80,13 @@ describe("PassportID and EmployerClaim Contracts", function () {
     expect(await diplomaID.registered(this.signers.alice.address));
   });
 
+  /**
+   * Test case: Ensures that a user cannot register their diploma multiple times
+   * Steps:
+   * 1. Register diploma once successfully
+   * 2. Attempt to register again with same data
+   * 3. Verify the second attempt is rejected
+   */
   it("should prevent duplicate registration for the same user", async function () {
     // Register the identity once
     const input = this.instances.alice.createEncryptedInput(this.diplomaAddress, this.signers.alice.address);
@@ -92,6 +118,14 @@ describe("PassportID and EmployerClaim Contracts", function () {
     ).to.be.revertedWith("Diploma already registered!");
   });
 
+  /**
+   * Test case: Verifies that registered diploma data can be retrieved and decrypted
+   * Steps:
+   * 1. Register encrypted diploma data
+   * 2. Retrieve the university data
+   * 3. Generate reencryption keys and signature
+   * 4. Reencrypt and verify the data
+   */
   it("should retrieve the registered identity", async function () {
     // Encrypt and register the identity
     const input = this.instances.alice.createEncryptedInput(this.diplomaAddress, this.signers.alice.address);
@@ -135,6 +169,14 @@ describe("PassportID and EmployerClaim Contracts", function () {
     expect(reencryptedFirstname).to.equal(8);
   });
 
+  /**
+   * Test case: Tests the generation of a degree claim from registered diploma
+   * Steps:
+   * 1. Register encrypted diploma data
+   * 2. Generate a degree claim
+   * 3. Verify claim generation event
+   * 4. Retrieve and decrypt claim data
+   */
   it("should generate an degree claim", async function () {
     // Encrypt and register the identity
     const inputId = this.instances.alice.createEncryptedInput(this.diplomaAddress, this.signers.alice.address);
