@@ -1,7 +1,7 @@
 import { ethers } from "hardhat";
 
-import type { IdMapping } from "../../types";
-import { getSigners } from "../signers";
+import type { IdMapping } from "../../../types";
+import { getSigners } from "../../signers";
 
 export async function deployIdMappingFixture(): Promise<IdMapping> {
   const signers = await getSigners();

@@ -6,85 +6,120 @@ import "./PassportID.sol"; // Import PassportID contract
 import "./Diploma.sol";
 
 contract EmployerClaim {
-    // PassportID public passportContract; // Reference to the PassportID contract
+    uint64 public lastClaimId = 0;
+    // Mapping of claim IDs to boolean results for adult claims
+    mapping(uint64 => ebool) public adultClaims;
+    // Mapping of claim IDs to boolean results for degree claims
+    mapping(uint64 => ebool) public degreeClaims;
+    // Mapping of user IDs to boolean results for verified claims
+    mapping(uint256 => ebool) public verifiedClaims;
 
-    mapping(euint64 => ebool) public adultClaims; // Mapping of claim IDs to boolean results
-    mapping(euint64 => ebool) public degreeClaims; // Add new mapping for degree claims
+    // Event emitted when an adult claim is generated
+    event AdultClaimGenerated(uint64 claimId, uint256 userId);
+    // Event emitted when a degree claim is generated
+    event DegreeClaimGenerated(uint64 claimId, uint256 userId);
 
-    mapping(address => euint64) public latestClaimId;
+    // Instance of IdMapping contract
+    IdMapping private idMapping;
+    // Address of the contract owner
+    address public owner;
 
-    event AdultClaimGenerated(euint64 claimId, address user);
-    event DegreeClaimGenerated(euint64 claimId, address user); // Add new event
+    // Constructor to initialize the contract with IdMapping address
+    constructor(address _idMappingAddress) {
+        idMapping = IdMapping(_idMappingAddress);
+        owner = msg.sender;
+    }
 
     // Generate an age claim to verify if a user is above a certain age (e.g., 18)
-    function generateAdultClaim(address user, address _passportContract) public returns (euint64) {
+    function generateAdultClaim(uint256 userId, address _passportContract) public returns (uint64) {
         // Retrieve the user's encrypted birthdate from the PassportID contract
         PassportID passport = PassportID(_passportContract);
-        euint64 birthdate = passport.getBirthdate(user);
+        euint64 birthdate = passport.getBirthdate(userId);
 
-        // // Set age threshold to 18 years (in Unix timestamp)
+        // Set age threshold to 18 years (in Unix timestamp)
         euint64 ageThreshold = TFHE.asEuint64(1704067200); // Jan 1, 2024 - 18 years
 
-        // // Generate a unique claim ID
-        euint64 claimId = TFHE.randEuint64();
+        lastClaimId++;
 
-        // // Check if birthdate indicates user is over 18
-        ebool isAdult = TFHE.ge(birthdate, ageThreshold);
+        // Check if birthdate indicates user is over 18
+        ebool isAdult = TFHE.le(birthdate, ageThreshold);
 
-        // // Store the result of the claim
-        adultClaims[claimId] = isAdult;
+        // Store the result of the claim
+        adultClaims[lastClaimId] = isAdult;
 
-        // // Grant access to the claim to both the contract and user for verification purposes
-        TFHE.allow(isAdult, _passportContract);
+        // Retrieve the address associated with the user ID
+        address addressToBeAllowed = idMapping.getAddr(userId);
+
+        // Grant access to the claim to both the contract and user for verification purposes
         TFHE.allow(isAdult, address(this));
-        TFHE.allow(isAdult, msg.sender);
-        TFHE.allow(isAdult, user);
+        TFHE.allow(isAdult, addressToBeAllowed);
 
-        latestClaimId[user] = claimId; // Store claimId for the user
+        // Emit an event for the generated claim
+        emit AdultClaimGenerated(lastClaimId, userId);
 
-        // // Emit an event for the generated claim
-        emit AdultClaimGenerated(claimId, user);
-
-        return claimId;
+        return lastClaimId;
     }
 
     // Retrieve the result of an adult claim using the claim ID
-    function getAdultClaim(euint64 claimId) public view returns (ebool) {
+    function getAdultClaim(uint64 claimId) public view returns (ebool) {
         return adultClaims[claimId];
     }
 
     // Generate a claim to verify if a user has a specific degree from a specific university
-    function generateDegreeClaim(address user, address _diplomaContract) public returns (euint64) {
-        // Get the diploma data
+    function generateDegreeClaim(uint256 userId, address _diplomaContract) public returns (uint64) {
+        // Get the diploma data from the Diploma contract
         Diploma diploma = Diploma(_diplomaContract);
-        euint8 userUniversity = diploma.getMyDegree(user);
+        euint8 userUniversity = diploma.getMyDegree(userId);
 
-        // Generate a unique claim ID
-        euint64 claimId = TFHE.randEuint64();
+        lastClaimId++;
 
-        euint8 requiredDegree = TFHE.randEuint8();
+        // Generate a random required degree for comparison
+        euint8 requiredDegree = TFHE.asEuint8(1);
 
         // Check if university and degree match requirements
         ebool degreeMatch = TFHE.eq(userUniversity, requiredDegree);
 
         // Store the result of the claim
-        degreeClaims[claimId] = degreeMatch;
+        degreeClaims[lastClaimId] = degreeMatch;
+
+        // Retrieve the address associated with the user ID
+        address addressToBeAllowed = idMapping.getAddr(userId);
 
         // Grant access to the claim
-        TFHE.allow(degreeMatch, _diplomaContract);
         TFHE.allow(degreeMatch, address(this));
-        TFHE.allow(degreeMatch, msg.sender);
-        TFHE.allow(degreeMatch, user);
+        TFHE.allow(degreeMatch, addressToBeAllowed);
 
-        latestClaimId[user] = claimId;
+        // Emit an event for the generated claim
+        emit DegreeClaimGenerated(lastClaimId, userId);
 
-        emit DegreeClaimGenerated(claimId, user);
-
-        return claimId;
+        return lastClaimId;
     }
 
     // Retrieve the result of a degree claim using the claim ID
-    function getDegreeClaim(euint64 claimId) public view returns (ebool) {
+    function getDegreeClaim(uint64 claimId) public view returns (ebool) {
         return degreeClaims[claimId];
+    }
+
+    // Function to verify if both adult and degree claims are true for a user
+    function verifyClaims(uint256 userId, uint64 adultClaim, uint64 degreeClaim) public {
+        ebool isAdult = adultClaims[adultClaim];
+        ebool hasDegree = degreeClaims[degreeClaim];
+
+        ebool verify = TFHE.and(isAdult, hasDegree);
+
+        // Store the verification result under the userId mapping
+        verifiedClaims[userId] = verify;
+
+        // Retrieve the address associated with the user ID
+        address addressToBeAllowed = idMapping.getAddr(userId);
+
+        // Grant access to the claim
+        TFHE.allow(verify, address(this));
+        TFHE.allow(verify, addressToBeAllowed);
+    }
+
+    // Retrieve the result of a degree claim using the claim ID
+    function getVerifyClaim(uint256 userId) public view returns (ebool) {
+        return verifiedClaims[userId];
     }
 }

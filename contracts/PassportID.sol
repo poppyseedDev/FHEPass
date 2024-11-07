@@ -2,38 +2,90 @@
 pragma solidity ^0.8.19;
 
 import "fhevm/lib/TFHE.sol";
+import "./IdMapping.sol";
 
 contract PassportID {
-    // Identity fields stored separately
+    // Mapping to store addresses with registrar role
+    mapping(address => bool) public registrars;
+    // Address of the contract owner
+    address public owner;
+
+    // Structure to hold encrypted identity data
     struct Identity {
         euint64 id; // Encrypted unique ID
         euint8 biodata; // Encrypted biodata (e.g., biometric data or hashed identity data)
-        euint8 firstname;
-        euint8 lastname;
+        euint8 firstname; // Encrypted first name
+        euint8 lastname; // Encrypted last name
         euint64 birthdate; // Encrypted birthdate for age verification
     }
 
-    mapping(address => Identity) private citizenIdentities; // Mapping from address to identity
-    mapping(address => bool) public registered; // Track if an address is registered
+    // Instance of IdMapping contract
+    IdMapping private idMapping;
 
+    // Mapping to store identities by user ID
+    mapping(uint256 => Identity) private citizenIdentities;
+    // Mapping to track registered identities
+    mapping(uint256 => bool) public registered;
+
+    // Event emitted when an identity is registered
     event IdentityRegistered(address indexed user);
+    // Event emitted when a claim is generated
     event ClaimGenerated(eaddress indexed user, euint64 claimId);
+    // Event emitted when a registrar is added
+    event RegistrarAdded(address indexed registrar);
+    // Event emitted when a registrar is removed
+    event RegistrarRemoved(address indexed registrar);
 
-    // Register a new identity
+    // Constructor to initialize the contract with IdMapping address
+    constructor(address _idMappingAddress) {
+        idMapping = IdMapping(_idMappingAddress);
+        owner = msg.sender;
+        registrars[msg.sender] = true; // Assign owner as a registrar
+    }
+
+    // Modifier to restrict access to registrars
+    modifier onlyRegistrar() {
+        require(registrars[msg.sender], "Only registrars can perform this action");
+        _;
+    }
+
+    // Modifier to restrict access to the contract owner
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can perform this action");
+        _;
+    }
+
+    // Function to add a new registrar, only callable by the owner
+    function addRegistrar(address registrar) external onlyOwner {
+        require(registrar != address(0), "Invalid registrar address");
+        registrars[registrar] = true;
+        emit RegistrarAdded(registrar);
+    }
+
+    // Function to remove a registrar, only callable by the owner
+    function removeRegistrar(address registrar) external onlyOwner {
+        require(registrar != owner, "Cannot remove owner as registrar");
+        registrars[registrar] = false;
+        emit RegistrarRemoved(registrar);
+    }
+
+    // Function to register a new identity, only callable by a registrar
     function registerIdentity(
+        uint256 userId,
         einput biodata,
         einput firstname,
         einput lastname,
         einput birthdate,
         bytes calldata inputProof
-    ) public virtual returns (bool) {
-        // Ensure uniqueness by checking if the address is already registered
-        require(!registered[msg.sender], "Already registered!");
+    ) public virtual onlyRegistrar returns (bool) {
+        require(userId != 0, "ID not generated. Please call generateId first.");
+        require(!registered[userId], "Already registered!");
 
-        // Assign new encrypted identity fields
-        euint64 newId = TFHE.randEuint64(); // Generate a random unique ID
+        // Generate a new encrypted unique ID
+        euint64 newId = TFHE.randEuint64();
 
-        citizenIdentities[msg.sender] = Identity({
+        // Store the encrypted identity data
+        citizenIdentities[userId] = Identity({
             id: newId,
             biodata: TFHE.asEuint8(biodata, inputProof),
             firstname: TFHE.asEuint8(firstname, inputProof),
@@ -41,61 +93,67 @@ contract PassportID {
             birthdate: TFHE.asEuint64(birthdate, inputProof)
         });
 
-        registered[msg.sender] = true;
+        registered[userId] = true; // Mark the identity as registered
 
-        TFHE.allow(citizenIdentities[msg.sender].id, msg.sender);
-        TFHE.allow(citizenIdentities[msg.sender].biodata, msg.sender);
-        TFHE.allow(citizenIdentities[msg.sender].firstname, msg.sender);
-        TFHE.allow(citizenIdentities[msg.sender].lastname, msg.sender);
-        TFHE.allow(citizenIdentities[msg.sender].birthdate, msg.sender);
+        // Get the address associated with the user ID
+        address addressToBeAllowed = idMapping.getAddr(userId);
 
-        TFHE.allow(citizenIdentities[msg.sender].id, address(this));
-        TFHE.allow(citizenIdentities[msg.sender].biodata, address(this));
-        TFHE.allow(citizenIdentities[msg.sender].firstname, address(this));
-        TFHE.allow(citizenIdentities[msg.sender].lastname, address(this));
-        TFHE.allow(citizenIdentities[msg.sender].birthdate, address(this));
+        // Allow the user to access their own data
+        TFHE.allow(citizenIdentities[userId].id, addressToBeAllowed);
+        TFHE.allow(citizenIdentities[userId].biodata, addressToBeAllowed);
+        TFHE.allow(citizenIdentities[userId].firstname, addressToBeAllowed);
+        TFHE.allow(citizenIdentities[userId].lastname, addressToBeAllowed);
+        TFHE.allow(citizenIdentities[userId].birthdate, addressToBeAllowed);
 
-        emit IdentityRegistered(msg.sender);
+        // Allow the contract to access the data
+        TFHE.allow(citizenIdentities[userId].id, address(this));
+        TFHE.allow(citizenIdentities[userId].biodata, address(this));
+        TFHE.allow(citizenIdentities[userId].firstname, address(this));
+        TFHE.allow(citizenIdentities[userId].lastname, address(this));
+        TFHE.allow(citizenIdentities[userId].birthdate, address(this));
+
+        emit IdentityRegistered(addressToBeAllowed); // Emit event for identity registration
 
         return true;
     }
 
-    // Function to retrieve encrypted identity data
-    function getIdentity(address user) public view virtual returns (euint64, euint8, euint8, euint8, euint64) {
-        require(registered[user], "Identity not registered!");
+    // Function to get the encrypted identity data for a user
+    function getIdentity(uint256 userId) public view virtual returns (euint64, euint8, euint8, euint8, euint64) {
+        require(registered[userId], "Identity not registered!");
         return (
-            citizenIdentities[user].id,
-            citizenIdentities[user].biodata,
-            citizenIdentities[user].firstname,
-            citizenIdentities[user].lastname,
-            citizenIdentities[user].birthdate
+            citizenIdentities[userId].id,
+            citizenIdentities[userId].biodata,
+            citizenIdentities[userId].firstname,
+            citizenIdentities[userId].lastname,
+            citizenIdentities[userId].birthdate
         );
     }
 
-    // Function to retrieve encrypted birthdate
-    function getBirthdate(address user) public view virtual returns (euint64) {
-        require(registered[user], "Identity not registered!");
-        return citizenIdentities[user].birthdate;
+    // Function to get the encrypted birthdate for a user
+    function getBirthdate(uint256 userId) public view virtual returns (euint64) {
+        require(registered[userId], "Identity not registered!");
+        return citizenIdentities[userId].birthdate;
     }
 
-    // Function to retrieve encrypted firstname
-    function getMyIdentityFirstname(address user) public view virtual returns (euint8) {
-        require(registered[user], "Identity not registered!");
-        return citizenIdentities[user].firstname;
+    // Function to get the encrypted first name for a user
+    function getMyIdentityFirstname(uint256 userId) public view virtual returns (euint8) {
+        require(registered[userId], "Identity not registered!");
+        return citizenIdentities[userId].firstname;
     }
 
-    // Allow transient access to fields for verifiable claims
+    // Function to generate a claim for a user's identity
     function generateClaim(address claimAddress, string memory claimFn) public {
-        // Grant temporary access for citizen's birthdate to be used in the claim generation
-        TFHE.allowTransient(citizenIdentities[msg.sender].birthdate, claimAddress);
+        // Only the msg.sender that is registered under the user ID can make the claim
+        uint256 userId = idMapping.getId(msg.sender);
+
+        // Grant temporary access for citizen's birthdate to be used in claim generation
+        TFHE.allowTransient(citizenIdentities[userId].birthdate, claimAddress);
 
         // Ensure the sender can access this citizen's birthdate
-        require(TFHE.isSenderAllowed(citizenIdentities[msg.sender].birthdate), "Access to birthdate not permitted");
+        require(TFHE.isSenderAllowed(citizenIdentities[userId].birthdate), "Access to birthdate not permitted");
 
         // Attempt the external call and capture the result
-        (bool success, bytes memory data) = claimAddress.call(
-            abi.encodeWithSignature(claimFn, msg.sender, address(this))
-        );
+        (bool success, bytes memory data) = claimAddress.call(abi.encodeWithSignature(claimFn, userId, address(this)));
         require(success, string(abi.encodePacked("Claim generation failed: ", data)));
     }
 }
