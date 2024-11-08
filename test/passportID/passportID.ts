@@ -1,5 +1,7 @@
+import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { toBufferBE } from "bigint-buffer";
 import { expect } from "chai";
+import type { FhevmInstance } from "fhevmjs";
 
 import type { Diploma, EmployerClaim, IdMapping, PassportID } from "../../types";
 import { createInstances } from "../instance";
@@ -39,23 +41,22 @@ describe("PassportID and EmployerClaim Contracts", function () {
     this.instances = await createInstances(this.signers);
   });
 
-  // Test case: Register an identity successfully
-  it("should register an identity successfully", async function () {
-    await idMapping.connect(this.signers.alice).generateId();
-    const userId = await idMapping.getId(this.signers.alice);
+  // Helper function to register identity
+  async function registerIdentity(
+    userId: bigint,
+    instance: FhevmInstance,
+    passportAddress: string,
+    signer: HardhatEthersSigner,
+    biodata = 8,
+    firstname = 8,
+    lastname = 8,
+    birthdate = 1234n,
+  ) {
+    const input = instance.createEncryptedInput(passportAddress, signer.address);
+    const encryptedData = input.add8(biodata).add8(firstname).add8(lastname).add64(birthdate).encrypt();
 
-    // Create encrypted inputs for registration
-    const input = this.instances.alice.createEncryptedInput(this.passportIDAddress, this.signers.alice.address);
-    const encryptedData = input
-      .add8(8) // Encrypted biodata hash
-      .add8(8) // Encrypted first name
-      .add8(8) // Encrypted last name
-      .add64(1234) // Encrypted birthdate as uint64
-      .encrypt(); // Encrypts and generates inputProof
-
-    // Register identity with encrypted inputs
     await passportID
-      .connect(this.signers.alice)
+      .connect(signer)
       .registerIdentity(
         userId,
         encryptedData.handles[0],
@@ -64,8 +65,24 @@ describe("PassportID and EmployerClaim Contracts", function () {
         encryptedData.handles[3],
         encryptedData.inputProof,
       );
+  }
 
-    // Verify that the identity is registered
+  // Helper function to setup reencryption
+  async function setupReencryption(instance: FhevmInstance, signer: HardhatEthersSigner, contractAddress: string) {
+    const { publicKey, privateKey } = instance.generateKeypair();
+    const eip712 = instance.createEIP712(publicKey, contractAddress);
+    const signature = await signer.signTypedData(eip712.domain, { Reencrypt: eip712.types.Reencrypt }, eip712.message);
+
+    return { publicKey, privateKey, signature: signature.replace("0x", "") };
+  }
+
+  // Test case: Register an identity successfully
+  it("should register an identity successfully", async function () {
+    await idMapping.connect(this.signers.alice).generateId();
+    const userId = await idMapping.getId(this.signers.alice);
+
+    await registerIdentity(userId, this.instances.alice, this.passportIDAddress, this.signers.alice);
+
     expect(await passportID.registered(this.signers.alice.address));
   });
 
@@ -74,39 +91,11 @@ describe("PassportID and EmployerClaim Contracts", function () {
     await idMapping.connect(this.signers.alice).generateId();
     const userId = await idMapping.getId(this.signers.alice);
 
-    // Register the identity once
-    const input = this.instances.alice.createEncryptedInput(this.passportIDAddress, this.signers.alice.address);
-    const encryptedData = input
-      .add8(8) // Encrypted biodata hash
-      .add8(8) // Encrypted first name
-      .add8(8) // Encrypted last name
-      .add64(1234)
-      .encrypt();
+    await registerIdentity(userId, this.instances.alice, this.passportIDAddress, this.signers.alice);
 
-    await passportID
-      .connect(this.signers.alice)
-      .registerIdentity(
-        userId,
-        encryptedData.handles[0],
-        encryptedData.handles[1],
-        encryptedData.handles[2],
-        encryptedData.handles[3],
-        encryptedData.inputProof,
-      );
-
-    // Try to register the same identity again and expect it to revert
     await expect(
-      passportID
-        .connect(this.signers.alice)
-        .registerIdentity(
-          userId,
-          encryptedData.handles[0],
-          encryptedData.handles[1],
-          encryptedData.handles[2],
-          encryptedData.handles[3],
-          encryptedData.inputProof,
-        ),
-    ).to.be.revertedWith("Already registered!");
+      registerIdentity(userId, this.instances.alice, this.passportIDAddress, this.signers.alice),
+    ).to.be.revertedWithCustomError(passportID, "AlreadyRegistered");
   });
 
   // Test case: Retrieve the registered identity
@@ -114,49 +103,25 @@ describe("PassportID and EmployerClaim Contracts", function () {
     await idMapping.connect(this.signers.alice).generateId();
     const userId = await idMapping.getId(this.signers.alice);
 
-    // Encrypt and register the identity
-    const input = this.instances.alice.createEncryptedInput(this.passportIDAddress, this.signers.alice.address);
-    const encryptedData = input
-      .add8(8) // Encrypted biodata hash
-      .add8(8) // Encrypted first name
-      .add8(8) // Encrypted last name
-      .add64(1234)
-      .encrypt();
+    await registerIdentity(userId, this.instances.alice, this.passportIDAddress, this.signers.alice);
 
-    await passportID
-      .connect(this.signers.alice)
-      .registerIdentity(
-        userId,
-        encryptedData.handles[0],
-        encryptedData.handles[1],
-        encryptedData.handles[2],
-        encryptedData.handles[3],
-        encryptedData.inputProof,
-      );
-
-    // Retrieve and validate the registered identity data
     const firstnameHandleAlice = await passportID.getMyIdentityFirstname(userId);
 
-    // Generate keypair for reencryption
-    const { publicKey: publicKeyAlice, privateKey: privateKeyAlice } = this.instances.alice.generateKeypair();
-    const eip712 = this.instances.alice.createEIP712(publicKeyAlice, this.passportIDAddress);
-    const signature = await this.signers.alice.signTypedData(
-      eip712.domain,
-      { Reencrypt: eip712.types.Reencrypt },
-      eip712.message,
+    const { publicKey, privateKey, signature } = await setupReencryption(
+      this.instances.alice,
+      this.signers.alice,
+      this.passportIDAddress,
     );
 
-    // Reencrypt the firstname field
     const reencryptedFirstname = await this.instances.alice.reencrypt(
       firstnameHandleAlice,
-      privateKeyAlice,
-      publicKeyAlice,
-      signature.replace("0x", ""),
+      privateKey,
+      publicKey,
+      signature,
       this.passportIDAddress,
       this.signers.alice.address,
     );
 
-    // Verify the reencrypted firstname
     expect(reencryptedFirstname).to.equal(8);
   });
 
@@ -165,58 +130,32 @@ describe("PassportID and EmployerClaim Contracts", function () {
     await idMapping.connect(this.signers.alice).generateId();
     const userId = await idMapping.getId(this.signers.alice);
 
-    // Encrypt and register the identity
-    const inputId = this.instances.alice.createEncryptedInput(this.passportIDAddress, this.signers.alice.address);
-    const encryptedData = inputId
-      .add8(8) // Encrypted biodata hash
-      .add8(8) // Encrypted first name
-      .add8(8) // Encrypted last name
-      .add64(1234) // Encrypted birthdate
-      .encrypt();
+    await registerIdentity(userId, this.instances.alice, this.passportIDAddress, this.signers.alice);
 
-    await passportID
-      .connect(this.signers.alice)
-      .registerIdentity(
-        userId,
-        encryptedData.handles[0],
-        encryptedData.handles[1],
-        encryptedData.handles[2],
-        encryptedData.handles[3],
-        encryptedData.inputProof,
-      );
-
-    // Generate the adult claim with encrypted threshold
     const tx = await passportID
       .connect(this.signers.alice)
       .generateClaim(this.employerClaimAddress, "generateAdultClaim(uint256,address)");
 
-    // Verify that the AdultClaimGenerated event is emitted
     await expect(tx).to.emit(employerClaim, "AdultClaimGenerated");
 
-    // Retrieve the latest claim user ID
     const latestClaimUserId = await employerClaim.lastClaimId();
     const adultsClaim = await employerClaim.getAdultClaim(latestClaimUserId);
 
-    // Generate keypair for reencryption
-    const { publicKey: publicKeyAlice, privateKey: privateKeyAlice } = this.instances.alice.generateKeypair();
-    const eip712 = this.instances.alice.createEIP712(publicKeyAlice, this.employerClaimAddress);
-    const signature = await this.signers.alice.signTypedData(
-      eip712.domain,
-      { Reencrypt: eip712.types.Reencrypt },
-      eip712.message,
+    const { publicKey, privateKey, signature } = await setupReencryption(
+      this.instances.alice,
+      this.signers.alice,
+      this.employerClaimAddress,
     );
 
-    // Reencrypt the adult claim
     const reencryptedFirstname = await this.instances.alice.reencrypt(
       adultsClaim,
-      privateKeyAlice,
-      publicKeyAlice,
-      signature.replace("0x", ""),
+      privateKey,
+      publicKey,
+      signature,
       this.employerClaimAddress,
       this.signers.alice.address,
     );
 
-    // Verify the reencrypted adult claim
     expect(reencryptedFirstname).to.equal(1);
   });
 });

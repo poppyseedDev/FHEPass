@@ -3,12 +3,25 @@ pragma solidity ^0.8.19;
 
 import "fhevm/lib/TFHE.sol";
 import "./IdMapping.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 
-contract Diploma {
+contract Diploma is AccessControl {
+    // Constants
+    uint256 private constant INVALID_ID = 0;
+    bytes32 public constant REGISTRAR_ROLE = keccak256("REGISTRAR_ROLE");
+
+    // Custom errors
+    error OnlyRegistrarAllowed();
+    error InvalidRegistrarAddress();
+    error InvalidUserId();
+    error DiplomaAlreadyRegistered();
+    error DiplomaNotRegistered();
+    error AccessNotPermitted();
+    error ClaimGenerationFailed(bytes data);
+    error CannotRemoveOwnerAsRegistrar();
+
     // Mapping to store addresses with registrar role
     mapping(address => bool) public registrars;
-    // Address of the contract owner
-    address public owner;
 
     // Structure to hold encrypted diploma data
     struct DiplomaData {
@@ -38,34 +51,24 @@ contract Diploma {
     // Constructor to initialize the contract with IdMapping address
     constructor(address _idMappingAddress) {
         idMapping = IdMapping(_idMappingAddress);
-        owner = msg.sender;
-        registrars[msg.sender] = true; // Assign owner as a registrar
+        grantRole(DEFAULT_ADMIN_ROLE, msg.sender); // Admin role for contract owner
+        grantRole(REGISTRAR_ROLE, msg.sender); // Registrar role for contract owner
     }
 
     // Modifier to restrict access to registrars
     modifier onlyRegistrar() {
-        require(registrars[msg.sender], "Only registrars can perform this action");
+        if (!registrars[msg.sender]) revert OnlyRegistrarAllowed();
         _;
     }
 
-    // Modifier to restrict access to the contract owner
-    modifier onlyOwner() {
-        require(msg.sender == owner, "Only owner can perform this action");
-        _;
+    // Function to add a new registrar, only callable by the admin
+    function addRegistrar(address registrar) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        grantRole(REGISTRAR_ROLE, registrar);
     }
 
-    // Function to add a new registrar, only callable by the owner
-    function addRegistrar(address registrar) external onlyOwner {
-        require(registrar != address(0), "Invalid registrar address");
-        registrars[registrar] = true;
-        emit RegistrarAdded(registrar);
-    }
-
-    // Function to remove a registrar, only callable by the owner
-    function removeRegistrar(address registrar) external onlyOwner {
-        require(registrar != owner, "Cannot remove owner as registrar");
-        registrars[registrar] = false;
-        emit RegistrarRemoved(registrar);
+    // Function to remove a registrar, only callable by the admin
+    function removeRegistrar(address registrar) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        revokeRole(REGISTRAR_ROLE, registrar);
     }
 
     // Function to register a diploma, only callable by a registrar
@@ -75,9 +78,9 @@ contract Diploma {
         einput degree,
         einput grade,
         bytes calldata inputProof
-    ) public virtual onlyRegistrar returns (bool) {
-        require(userId != 0, "ID not generated. Please call generateId first.");
-        require(!registered[userId], "Diploma already registered!");
+    ) public virtual onlyRole(REGISTRAR_ROLE) returns (bool) {
+        if (userId == INVALID_ID) revert InvalidUserId();
+        if (registered[userId]) revert DiplomaAlreadyRegistered();
 
         // Generate a new encrypted diploma ID
         euint64 newId = TFHE.randEuint64();
@@ -114,19 +117,19 @@ contract Diploma {
 
     // Function to get the encrypted university identifier for a user
     function getMyUniversity(uint256 userId) public view returns (euint8) {
-        require(registered[userId], "Diploma not registered!");
+        if (!registered[userId]) revert DiplomaNotRegistered();
         return diplomaRecords[userId].university;
     }
 
     // Function to get the encrypted degree type for a user
     function getMyDegree(uint256 userId) public view virtual returns (euint8) {
-        require(registered[userId], "Diploma not registered!");
+        if (!registered[userId]) revert DiplomaNotRegistered();
         return diplomaRecords[userId].degree;
     }
 
     // Function to get the encrypted grade for a user
     function getMyGrade(uint256 userId) public view virtual returns (euint8) {
-        require(registered[userId], "Diploma not registered!");
+        if (!registered[userId]) revert DiplomaNotRegistered();
         return diplomaRecords[userId].grade;
     }
 
@@ -139,19 +142,17 @@ contract Diploma {
     function generateClaim(address claimAddress, string memory claimFn) public {
         // Only the msg.sender that is registered under the user ID can make the claim
         uint256 userId = idMapping.getId(msg.sender);
-        require(userId != 0, "ID not generated. Please call generateId first.");
+        if (userId == INVALID_ID) revert InvalidUserId();
 
         // Grant temporary access for graduate's data to be used in claim generation
-        // TFHE.allowTransient(diplomaRecords[userId].grade, claimAddress);
-        // TFHE.allowTransient(diplomaRecords[userId].university, claimAddress);
         TFHE.allowTransient(diplomaRecords[userId].degree, claimAddress);
 
         // Ensure the sender can access this graduate's data
-        require(TFHE.isSenderAllowed(diplomaRecords[userId].degree), "Access to degree not permitted");
+        if (!TFHE.isSenderAllowed(diplomaRecords[userId].degree)) revert AccessNotPermitted();
 
         // Attempt the external call and capture the result
         (bool success, bytes memory data) = claimAddress.call(abi.encodeWithSignature(claimFn, userId, address(this)));
-        require(success, string(abi.encodePacked("Claim generation failed: ", data)));
+        if (!success) revert ClaimGenerationFailed(data);
 
         emit ClaimGenerated(msg.sender, claimAddress, claimFn); // Emit event for claim generation
     }

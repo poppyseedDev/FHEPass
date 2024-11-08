@@ -3,12 +3,22 @@ pragma solidity ^0.8.19;
 
 import "fhevm/lib/TFHE.sol";
 import "./IdMapping.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 
-contract PassportID {
-    // Mapping to store addresses with registrar role
-    mapping(address => bool) public registrars;
-    // Address of the contract owner
-    address public owner;
+contract PassportID is AccessControl {
+    // Constants
+    uint256 private constant INVALID_ID = 0;
+    bytes32 public constant REGISTRAR_ROLE = keccak256("REGISTRAR_ROLE");
+
+    // Custom errors
+    error OnlyRegistrarAllowed();
+    error InvalidRegistrarAddress();
+    error CannotRemoveOwnerAsRegistrar();
+    error InvalidUserId();
+    error AlreadyRegistered();
+    error IdentityNotRegistered();
+    error AccessNotPermitted();
+    error ClaimGenerationFailed(bytes data);
 
     // Structure to hold encrypted identity data
     struct Identity {
@@ -22,6 +32,8 @@ contract PassportID {
     // Instance of IdMapping contract
     IdMapping private idMapping;
 
+    // Mapping to store addresses with registrar role
+    mapping(address => bool) public registrars;
     // Mapping to store identities by user ID
     mapping(uint256 => Identity) private citizenIdentities;
     // Mapping to track registered identities
@@ -39,34 +51,24 @@ contract PassportID {
     // Constructor to initialize the contract with IdMapping address
     constructor(address _idMappingAddress) {
         idMapping = IdMapping(_idMappingAddress);
-        owner = msg.sender;
-        registrars[msg.sender] = true; // Assign owner as a registrar
+        grantRole(DEFAULT_ADMIN_ROLE, msg.sender); // Admin role for contract owner
+        grantRole(REGISTRAR_ROLE, msg.sender); // Registrar role for contract owner
     }
 
     // Modifier to restrict access to registrars
     modifier onlyRegistrar() {
-        require(registrars[msg.sender], "Only registrars can perform this action");
+        if (!registrars[msg.sender]) revert OnlyRegistrarAllowed();
         _;
     }
 
-    // Modifier to restrict access to the contract owner
-    modifier onlyOwner() {
-        require(msg.sender == owner, "Only owner can perform this action");
-        _;
+    // Function to add a new registrar, only callable by the admin
+    function addRegistrar(address registrar) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        grantRole(REGISTRAR_ROLE, registrar);
     }
 
-    // Function to add a new registrar, only callable by the owner
-    function addRegistrar(address registrar) external onlyOwner {
-        require(registrar != address(0), "Invalid registrar address");
-        registrars[registrar] = true;
-        emit RegistrarAdded(registrar);
-    }
-
-    // Function to remove a registrar, only callable by the owner
-    function removeRegistrar(address registrar) external onlyOwner {
-        require(registrar != owner, "Cannot remove owner as registrar");
-        registrars[registrar] = false;
-        emit RegistrarRemoved(registrar);
+    // Function to remove a registrar, only callable by the admin
+    function removeRegistrar(address registrar) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        revokeRole(REGISTRAR_ROLE, registrar);
     }
 
     // Function to register a new identity, only callable by a registrar
@@ -77,9 +79,9 @@ contract PassportID {
         einput lastname,
         einput birthdate,
         bytes calldata inputProof
-    ) public virtual onlyRegistrar returns (bool) {
-        require(userId != 0, "ID not generated. Please call generateId first.");
-        require(!registered[userId], "Already registered!");
+    ) public virtual onlyRole(REGISTRAR_ROLE) returns (bool) {
+        if (userId == INVALID_ID) revert InvalidUserId();
+        if (registered[userId]) revert AlreadyRegistered();
 
         // Generate a new encrypted unique ID
         euint64 newId = TFHE.randEuint64();
@@ -119,7 +121,7 @@ contract PassportID {
 
     // Function to get the encrypted identity data for a user
     function getIdentity(uint256 userId) public view virtual returns (euint64, euint8, euint8, euint8, euint64) {
-        require(registered[userId], "Identity not registered!");
+        if (!registered[userId]) revert IdentityNotRegistered();
         return (
             citizenIdentities[userId].id,
             citizenIdentities[userId].biodata,
@@ -131,13 +133,13 @@ contract PassportID {
 
     // Function to get the encrypted birthdate for a user
     function getBirthdate(uint256 userId) public view virtual returns (euint64) {
-        require(registered[userId], "Identity not registered!");
+        if (!registered[userId]) revert IdentityNotRegistered();
         return citizenIdentities[userId].birthdate;
     }
 
     // Function to get the encrypted first name for a user
     function getMyIdentityFirstname(uint256 userId) public view virtual returns (euint8) {
-        require(registered[userId], "Identity not registered!");
+        if (!registered[userId]) revert IdentityNotRegistered();
         return citizenIdentities[userId].firstname;
     }
 
@@ -150,10 +152,10 @@ contract PassportID {
         TFHE.allowTransient(citizenIdentities[userId].birthdate, claimAddress);
 
         // Ensure the sender can access this citizen's birthdate
-        require(TFHE.isSenderAllowed(citizenIdentities[userId].birthdate), "Access to birthdate not permitted");
+        if (!TFHE.isSenderAllowed(citizenIdentities[userId].birthdate)) revert AccessNotPermitted();
 
         // Attempt the external call and capture the result
         (bool success, bytes memory data) = claimAddress.call(abi.encodeWithSignature(claimFn, userId, address(this)));
-        require(success, string(abi.encodePacked("Claim generation failed: ", data)));
+        if (!success) revert ClaimGenerationFailed(data);
     }
 }
