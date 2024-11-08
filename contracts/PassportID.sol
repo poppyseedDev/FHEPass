@@ -32,8 +32,6 @@ contract PassportID is AccessControl {
     // Instance of IdMapping contract
     IdMapping private idMapping;
 
-    // Mapping to store addresses with registrar role
-    mapping(address => bool) public registrars;
     // Mapping to store identities by user ID
     mapping(uint256 => Identity) private citizenIdentities;
     // Mapping to track registered identities
@@ -43,32 +41,22 @@ contract PassportID is AccessControl {
     event IdentityRegistered(address indexed user);
     // Event emitted when a claim is generated
     event ClaimGenerated(eaddress indexed user, euint64 claimId);
-    // Event emitted when a registrar is added
-    event RegistrarAdded(address indexed registrar);
-    // Event emitted when a registrar is removed
-    event RegistrarRemoved(address indexed registrar);
 
     // Constructor to initialize the contract with IdMapping address
     constructor(address _idMappingAddress) {
         idMapping = IdMapping(_idMappingAddress);
-        grantRole(DEFAULT_ADMIN_ROLE, msg.sender); // Admin role for contract owner
-        grantRole(REGISTRAR_ROLE, msg.sender); // Registrar role for contract owner
-    }
-
-    // Modifier to restrict access to registrars
-    modifier onlyRegistrar() {
-        if (!registrars[msg.sender]) revert OnlyRegistrarAllowed();
-        _;
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender); // Admin role for contract owner
+        _grantRole(REGISTRAR_ROLE, msg.sender); // Registrar role for contract owner
     }
 
     // Function to add a new registrar, only callable by the admin
     function addRegistrar(address registrar) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        grantRole(REGISTRAR_ROLE, registrar);
+        _grantRole(REGISTRAR_ROLE, registrar);
     }
 
     // Function to remove a registrar, only callable by the admin
     function removeRegistrar(address registrar) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        revokeRole(REGISTRAR_ROLE, registrar);
+        _revokeRole(REGISTRAR_ROLE, registrar);
     }
 
     // Function to register a new identity, only callable by a registrar
@@ -79,7 +67,7 @@ contract PassportID is AccessControl {
         einput lastname,
         einput birthdate,
         bytes calldata inputProof
-    ) public virtual onlyRole(REGISTRAR_ROLE) returns (bool) {
+    ) public virtual onlyRole(DEFAULT_ADMIN_ROLE) returns (bool) {
         if (userId == INVALID_ID) revert InvalidUserId();
         if (registered[userId]) revert AlreadyRegistered();
 

@@ -20,9 +20,6 @@ contract Diploma is AccessControl {
     error ClaimGenerationFailed(bytes data);
     error CannotRemoveOwnerAsRegistrar();
 
-    // Mapping to store addresses with registrar role
-    mapping(address => bool) public registrars;
-
     // Structure to hold encrypted diploma data
     struct DiplomaData {
         euint64 id; // Encrypted unique diploma ID
@@ -43,32 +40,22 @@ contract Diploma is AccessControl {
     event DiplomaRegistered(address indexed graduate);
     // Event emitted when a claim is generated
     event ClaimGenerated(address indexed graduate, address claimAddress, string claimFn);
-    // Event emitted when a registrar is added
-    event RegistrarAdded(address indexed registrar);
-    // Event emitted when a registrar is removed
-    event RegistrarRemoved(address indexed registrar);
 
     // Constructor to initialize the contract with IdMapping address
     constructor(address _idMappingAddress) {
         idMapping = IdMapping(_idMappingAddress);
-        grantRole(DEFAULT_ADMIN_ROLE, msg.sender); // Admin role for contract owner
-        grantRole(REGISTRAR_ROLE, msg.sender); // Registrar role for contract owner
-    }
-
-    // Modifier to restrict access to registrars
-    modifier onlyRegistrar() {
-        if (!registrars[msg.sender]) revert OnlyRegistrarAllowed();
-        _;
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender); // Admin role for contract owner
+        _grantRole(REGISTRAR_ROLE, msg.sender); // Registrar role for contract owner
     }
 
     // Function to add a new registrar, only callable by the admin
     function addRegistrar(address registrar) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        grantRole(REGISTRAR_ROLE, registrar);
+        _grantRole(REGISTRAR_ROLE, registrar);
     }
 
     // Function to remove a registrar, only callable by the admin
     function removeRegistrar(address registrar) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        revokeRole(REGISTRAR_ROLE, registrar);
+        _revokeRole(REGISTRAR_ROLE, registrar);
     }
 
     // Function to register a diploma, only callable by a registrar
@@ -78,7 +65,7 @@ contract Diploma is AccessControl {
         einput degree,
         einput grade,
         bytes calldata inputProof
-    ) public virtual onlyRole(REGISTRAR_ROLE) returns (bool) {
+    ) public virtual onlyRole(DEFAULT_ADMIN_ROLE) returns (bool) {
         if (userId == INVALID_ID) revert InvalidUserId();
         if (registered[userId]) revert DiplomaAlreadyRegistered();
 
