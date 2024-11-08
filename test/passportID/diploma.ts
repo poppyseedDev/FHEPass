@@ -150,6 +150,7 @@ describe("PassportID and EmployerClaim Contracts", function () {
       this.diplomaAddress,
     );
 
+    // Decrypt and verify university data
     const reencryptedFirstname = await this.instances.alice.reencrypt(
       universityHandleAlice,
       privateKey,
@@ -183,6 +184,7 @@ describe("PassportID and EmployerClaim Contracts", function () {
       this.employerClaimAddress,
     );
 
+    // Decrypt and verify claim result
     const reencryptedFirstname = await this.instances.alice.reencrypt(
       adultsClaim,
       privateKey,
