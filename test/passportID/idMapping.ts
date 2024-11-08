@@ -49,6 +49,6 @@ describe("IdMapping Contract", function () {
     expect(retrievedAddress).to.equal(await this.signers.alice.getAddress());
 
     // Verify getting an invalid ID reverts
-    await expect(idMapping.getAddr(999)).to.be.revertedWith("Invalid ID");
+    await expect(idMapping.getAddr(999)).to.be.revertedWithCustomError(idMapping, "InvalidId");
   });
 });
