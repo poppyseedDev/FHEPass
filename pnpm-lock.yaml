@@ -35,7 +35,7 @@ devDependencies:
     specifier: ^1.0.0
     version: 1.1.1(hardhat@2.22.15)
   '@openzeppelin/contracts':
-    specifier: ^5.0.2
+    specifier: ^5.1.0
     version: 5.1.0
   '@trivago/prettier-plugin-sort-imports':
     specifier: ^4.0.0

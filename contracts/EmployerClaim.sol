@@ -4,8 +4,9 @@ pragma solidity ^0.8.19;
 import "fhevm/lib/TFHE.sol";
 import "./PassportID.sol"; // Import PassportID contract
 import "./Diploma.sol";
+import "@openzeppelin/contracts/access/Ownable2Step.sol";
 
-contract EmployerClaim {
+contract EmployerClaim is Ownable2Step {
     // Constants
     uint64 private constant AGE_THRESHOLD_TIMESTAMP = 1704067200; // Jan 1, 2024 - 18 years
     uint8 private constant REQUIRED_DEGREE_LEVEL = 1;
@@ -34,14 +35,11 @@ contract EmployerClaim {
 
     // Instance of IdMapping contract
     IdMapping private idMapping;
-    // Address of the contract owner
-    address public owner;
 
     // Constructor to initialize the contract with IdMapping address
-    constructor(address _idMappingAddress) {
+    constructor(address _idMappingAddress) Ownable(msg.sender) {
         if (_idMappingAddress == address(0)) revert InvalidContractAddress();
         idMapping = IdMapping(_idMappingAddress);
-        owner = msg.sender;
     }
 
     // Generate an age claim to verify if a user is above a certain age (e.g., 18)
