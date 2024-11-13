@@ -150,7 +150,6 @@ describe("PassportID and EmployerClaim Contracts", function () {
       this.diplomaAddress,
     );
 
-    // Decrypt and verify university data
     const reencryptedFirstname = await this.instances.alice.reencrypt(
       universityHandleAlice,
       privateKey,
@@ -171,7 +170,7 @@ describe("PassportID and EmployerClaim Contracts", function () {
 
     const tx = await diplomaID
       .connect(this.signers.alice)
-      .generateClaim(this.employerClaimAddress, "generateDegreeClaim(uint256,address)");
+      .generateClaim(this.employerClaimAddress, "generateDegreeClaim(uint256,address)", ["degree"]);
 
     await expect(tx).to.emit(employerClaim, "DegreeClaimGenerated");
 
@@ -184,7 +183,6 @@ describe("PassportID and EmployerClaim Contracts", function () {
       this.employerClaimAddress,
     );
 
-    // Decrypt and verify claim result
     const reencryptedFirstname = await this.instances.alice.reencrypt(
       adultsClaim,
       privateKey,
@@ -205,7 +203,7 @@ describe("PassportID and EmployerClaim Contracts", function () {
 
     const degreeTx = await diplomaID
       .connect(this.signers.alice)
-      .generateClaim(this.employerClaimAddress, "generateDegreeClaim(uint256,address)");
+      .generateClaim(this.employerClaimAddress, "generateDegreeClaim(uint256,address)", ["degree"]);
 
     await expect(degreeTx).to.emit(employerClaim, "DegreeClaimGenerated");
 
@@ -216,7 +214,7 @@ describe("PassportID and EmployerClaim Contracts", function () {
 
     const adultTx = await passportID
       .connect(this.signers.alice)
-      .generateClaim(this.employerClaimAddress, "generateAdultClaim(uint256,address)");
+      .generateClaim(this.employerClaimAddress, "generateAdultClaim(uint256,address)", ["birthdate"]);
 
     await expect(adultTx).to.emit(employerClaim, "AdultClaimGenerated");
 

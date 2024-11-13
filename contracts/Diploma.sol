@@ -19,6 +19,7 @@ contract Diploma is AccessControl {
     error AccessNotPermitted();
     error ClaimGenerationFailed(bytes data);
     error CannotRemoveOwnerAsRegistrar();
+    error InvalidField();
 
     // Structure to hold encrypted diploma data
     struct DiplomaData {
@@ -124,18 +125,32 @@ contract Diploma is AccessControl {
     function hasDiploma(uint256 userId) public view returns (bool) {
         return registered[userId];
     }
-
     // Function to generate a claim for a diploma
-    function generateClaim(address claimAddress, string memory claimFn) public {
+    function generateClaim(address claimAddress, string memory claimFn, string[] memory fields) public {
         // Only the msg.sender that is registered under the user ID can make the claim
         uint256 userId = idMapping.getId(msg.sender);
         if (userId == INVALID_ID) revert InvalidUserId();
 
-        // Grant temporary access for graduate's data to be used in claim generation
-        TFHE.allowTransient(diplomaRecords[userId].degree, claimAddress);
+        // Grant temporary access for each requested field
+        for (uint i = 0; i < fields.length; i++) {
+            if (bytes(fields[i]).length == 0) revert InvalidField();
 
-        // Ensure the sender can access this graduate's data
-        if (!TFHE.isSenderAllowed(diplomaRecords[userId].degree)) revert AccessNotPermitted();
+            if (keccak256(bytes(fields[i])) == keccak256(bytes("university"))) {
+                TFHE.allowTransient(diplomaRecords[userId].university, claimAddress);
+                // Ensure the sender can access this university's data
+                if (!TFHE.isSenderAllowed(diplomaRecords[userId].university)) revert AccessNotPermitted();
+            } else if (keccak256(bytes(fields[i])) == keccak256(bytes("degree"))) {
+                TFHE.allowTransient(diplomaRecords[userId].degree, claimAddress);
+                // Ensure the sender can access this university's data
+                if (!TFHE.isSenderAllowed(diplomaRecords[userId].university)) revert AccessNotPermitted();
+            } else if (keccak256(bytes(fields[i])) == keccak256(bytes("grade"))) {
+                TFHE.allowTransient(diplomaRecords[userId].grade, claimAddress);
+                // Ensure the sender can access this university's data
+                if (!TFHE.isSenderAllowed(diplomaRecords[userId].university)) revert AccessNotPermitted();
+            } else {
+                revert InvalidField();
+            }
+        }
 
         // Attempt the external call and capture the result
         (bool success, bytes memory data) = claimAddress.call(abi.encodeWithSignature(claimFn, userId, address(this)));
