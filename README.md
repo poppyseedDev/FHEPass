@@ -50,28 +50,52 @@ The DID contract manages core identity data and allows the creation of encrypted
 ### DID Contract
 
 ```solidity
-contract DID {
+contract PassportID is AccessControl {
+  // Structure to hold encrypted identity data
   struct Identity {
-    uint256 id;
-    bytes32 biodata;   // Encrypted bio information
-    string firstname;
-    string lastname;
-    euint64 birthdate; // Encrypted birthdate
+      euint64 id; // Encrypted unique ID
+      euint8 biodata; // Encrypted biodata (e.g., biometric data or hashed identity data)
+      euint8 firstname; // Encrypted first name
+      euint8 lastname; // Encrypted last name
+      euint64 birthdate; // Encrypted birthdate for age verification
   }
 
-  // Maps each address to an Identity
-  mapping(address => Identity) public citizens;
+  // Mapping to store identities by user ID
+  mapping(uint256 => Identity) private citizenIdentities;
+  // ...
 
-  function getCitizen(address wallet) public view returns (Identity memory) {
-    return citizens[wallet];
+  // Function to get the encrypted birthdate for a user
+  function getBirthdate(uint256 userId) public view virtual returns (euint64) {
+      if (!registered[userId]) revert IdentityNotRegistered();
+      return citizenIdentities[userId].birthdate;
   }
 
-  function generateClaim(address claimAddress, string memory claimFn, string[] memory fields, address contract) public {
-    uint256 citizenId = citizens[msg.sender].id;
-    for (uint i = 0; i < fields.length; i++) {
-      TFHE.allowTransient(citizens[msg.sender][fields[i]], claimAddress);
-    }
-    claimAddress.call(abi.encodeWithSignature(claimFn, citizenId, contract));
+  // ...
+
+  // Function to generate a claim for a user's identity
+  function generateClaim(address claimAddress, string memory claimFn, string[] memory fields) public {
+      // Only the msg.sender that is registered under the user ID can make the claim
+      uint256 userId = idMapping.getId(msg.sender);
+      if (userId == INVALID_ID) revert InvalidUserId();
+
+      // Grant temporary access for each requested field
+      for (uint i = 0; i < fields.length; i++) {
+          if (bytes(fields[i]).length == 0) revert InvalidField();
+
+          if (keccak256(bytes(fields[i])) == keccak256(bytes("birthdate"))) {
+              TFHE.allowTransient(citizenIdentities[userId].birthdate, claimAddress);
+              if (!TFHE.isSenderAllowed(citizenIdentities[userId].birthdate)) revert AccessNotPermitted();
+          } // else if - repeating fields
+          else {
+              revert InvalidField();
+          }
+      }
+
+      // Attempt the external call and capture the result
+      (bool success, bytes memory data) = claimAddress.call(abi.encodeWithSignature(claimFn, userId, address(this)));
+      if (!success) revert ClaimGenerationFailed(data);
+
+      emit ClaimGenerated(msg.sender, claimAddress, claimFn); // Emit event for claim generation
   }
 }
 ```
@@ -79,10 +103,13 @@ contract DID {
 ### EmployerClaim Contract
 
 ```solidity
-contract EmployerClaim {
-  address didAddress;
+contract EmployerClaim is Ownable2Step {
+  // ...
 
-  mapping(uint256 => ebool) public employerClaims;
+  // Mapping of claim IDs to boolean results for adult claims
+  mapping(uint64 => ebool) public adultClaims;
+
+  // ...
 
   function generateAdultClaim(uint id, address contract) public returns (bytes32) {
     euint64 birthdate = DID(didAddress).getCitizen(id).birthdate;
@@ -90,6 +117,38 @@ contract EmployerClaim {
     employerClaims[claimId] = TFHE.ge(birthdate, 18); // Check if birthdate meets age threshold
     TFHE.allow(employerClaims[claimId], contract);
     return claimId;
+  }
+
+    // Generate an age claim to verify if a user is above a certain age (e.g., 18)
+  function generateAdultClaim(uint256 userId, address _passportContract) public returns (uint64) {
+      if (_passportContract == address(0)) revert InvalidContractAddress();
+      if (userId == INVALID_ID) revert InvalidUserId();
+
+      // Retrieve the address associated with the user ID
+      address addressToBeAllowed = idMapping.getAddr(userId);
+
+      // Retrieve the user's encrypted birthdate from the PassportID contract
+      euint64 birthdate = PassportID(_passportContract).getBirthdate(userId);
+
+      // Set age threshold to 18 years (in Unix timestamp)
+      euint64 ageThreshold = TFHE.asEuint64(AGE_THRESHOLD_TIMESTAMP);
+
+      lastClaimId++;
+
+      // Check if birthdate indicates user is over 18
+      ebool isAdult = TFHE.le(birthdate, ageThreshold);
+
+      // Store the result of the claim
+      adultClaims[lastClaimId] = isAdult;
+
+      // Grant access to the claim to both the contract and user for verification purposes
+      TFHE.allow(isAdult, address(this));
+      TFHE.allow(isAdult, addressToBeAllowed);
+
+      // Emit an event for the generated claim
+      emit AdultClaimGenerated(lastClaimId, userId);
+
+      return lastClaimId;
   }
 }
 ```
@@ -163,3 +222,55 @@ For VSCode users, [Solidity syntax highlighting](https://marketplace.visualstudi
 ## License
 
 This project is licensed under the MIT License.
+
+
+
+
+#### old
+
+### DID Contract
+
+```solidity
+contract DID {
+  struct Identity {
+    uint256 id;
+    bytes32 biodata;   // Encrypted bio information
+    string firstname;
+    string lastname;
+    euint64 birthdate; // Encrypted birthdate
+  }
+
+  // Maps each address to an Identity
+  mapping(address => Identity) public citizens;
+
+  function getCitizen(address wallet) public view returns (Identity memory) {
+    return citizens[wallet];
+  }
+
+  function generateClaim(address claimAddress, string memory claimFn, string[] memory fields, address contract) public {
+    uint256 citizenId = citizens[msg.sender].id;
+    for (uint i = 0; i < fields.length; i++) {
+      TFHE.allowTransient(citizens[msg.sender][fields[i]], claimAddress);
+    }
+    claimAddress.call(abi.encodeWithSignature(claimFn, citizenId, contract));
+  }
+}
+```
+
+### EmployerClaim Contract
+
+```solidity
+contract EmployerClaim {
+  address didAddress;
+
+  mapping(uint256 => ebool) public employerClaims;
+
+  function generateAdultClaim(uint id, address contract) public returns (bytes32) {
+    euint64 birthdate = DID(didAddress).getCitizen(id).birthdate;
+    bytes32 claimId = keccak256("age_check");
+    employerClaims[claimId] = TFHE.ge(birthdate, 18); // Check if birthdate meets age threshold
+    TFHE.allow(employerClaims[claimId], contract);
+    return claimId;
+  }
+}
+```
