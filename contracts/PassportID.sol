@@ -39,8 +39,6 @@ contract PassportID is AccessControl {
 
     // Event emitted when an identity is registered
     event IdentityRegistered(address indexed user);
-    // Event emitted when a claim is generated
-    event ClaimGenerated(eaddress indexed user, euint64 claimId);
 
     // Constructor to initialize the contract with IdMapping address
     constructor(address _idMappingAddress) {
