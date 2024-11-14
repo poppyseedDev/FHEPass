@@ -19,7 +19,6 @@ contract PassportID is AccessControl {
     error IdentityNotRegistered();
     error AccessNotPermitted();
     error ClaimGenerationFailed(bytes data);
-    error InvalidField();
 
     // Structure to hold encrypted identity data
     struct Identity {
@@ -41,10 +40,11 @@ contract PassportID is AccessControl {
     // Event emitted when an identity is registered
     event IdentityRegistered(address indexed user);
     // Event emitted when a claim is generated
-    event ClaimGenerated(address indexed user, address claimAddress, string claimFn);
+    event ClaimGenerated(eaddress indexed user, euint64 claimId);
 
     // Constructor to initialize the contract with IdMapping address
     constructor(address _idMappingAddress) {
+        TFHE.setFHEVM(FHEVMConfig.defaultConfig());
         idMapping = IdMapping(_idMappingAddress);
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender); // Admin role for contract owner
         _grantRole(REGISTRAR_ROLE, msg.sender); // Registrar role for contract owner
@@ -133,36 +133,18 @@ contract PassportID is AccessControl {
     }
 
     // Function to generate a claim for a user's identity
-    function generateClaim(address claimAddress, string memory claimFn, string[] memory fields) public {
+    function generateClaim(address claimAddress, string memory claimFn) public {
         // Only the msg.sender that is registered under the user ID can make the claim
         uint256 userId = idMapping.getId(msg.sender);
-        if (userId == INVALID_ID) revert InvalidUserId();
 
-        // Grant temporary access for each requested field
-        for (uint i = 0; i < fields.length; i++) {
-            if (bytes(fields[i]).length == 0) revert InvalidField();
+        // Grant temporary access for citizen's birthdate to be used in claim generation
+        TFHE.allowTransient(citizenIdentities[userId].birthdate, claimAddress);
 
-            if (keccak256(bytes(fields[i])) == keccak256(bytes("biodata"))) {
-                TFHE.allowTransient(citizenIdentities[userId].biodata, claimAddress);
-                if (!TFHE.isSenderAllowed(citizenIdentities[userId].biodata)) revert AccessNotPermitted();
-            } else if (keccak256(bytes(fields[i])) == keccak256(bytes("firstname"))) {
-                TFHE.allowTransient(citizenIdentities[userId].firstname, claimAddress);
-                if (!TFHE.isSenderAllowed(citizenIdentities[userId].firstname)) revert AccessNotPermitted();
-            } else if (keccak256(bytes(fields[i])) == keccak256(bytes("lastname"))) {
-                TFHE.allowTransient(citizenIdentities[userId].lastname, claimAddress);
-                if (!TFHE.isSenderAllowed(citizenIdentities[userId].lastname)) revert AccessNotPermitted();
-            } else if (keccak256(bytes(fields[i])) == keccak256(bytes("birthdate"))) {
-                TFHE.allowTransient(citizenIdentities[userId].birthdate, claimAddress);
-                if (!TFHE.isSenderAllowed(citizenIdentities[userId].birthdate)) revert AccessNotPermitted();
-            } else {
-                revert InvalidField();
-            }
-        }
+        // Ensure the sender can access this citizen's birthdate
+        if (!TFHE.isSenderAllowed(citizenIdentities[userId].birthdate)) revert AccessNotPermitted();
 
         // Attempt the external call and capture the result
         (bool success, bytes memory data) = claimAddress.call(abi.encodeWithSignature(claimFn, userId, address(this)));
         if (!success) revert ClaimGenerationFailed(data);
-
-        emit ClaimGenerated(msg.sender, claimAddress, claimFn); // Emit event for claim generation
     }
 }

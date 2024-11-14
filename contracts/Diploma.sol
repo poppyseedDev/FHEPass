@@ -19,7 +19,6 @@ contract Diploma is AccessControl {
     error AccessNotPermitted();
     error ClaimGenerationFailed(bytes data);
     error CannotRemoveOwnerAsRegistrar();
-    error InvalidField();
 
     // Structure to hold encrypted diploma data
     struct DiplomaData {
@@ -44,6 +43,7 @@ contract Diploma is AccessControl {
 
     // Constructor to initialize the contract with IdMapping address
     constructor(address _idMappingAddress) {
+        TFHE.setFHEVM(FHEVMConfig.defaultConfig()); // Set up the FHEVM configuration for this contract
         idMapping = IdMapping(_idMappingAddress);
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender); // Admin role for contract owner
         _grantRole(REGISTRAR_ROLE, msg.sender); // Registrar role for contract owner
@@ -104,7 +104,7 @@ contract Diploma is AccessControl {
     }
 
     // Function to get the encrypted university identifier for a user
-    function getMyUniversity(uint256 userId) public view returns (euint8) {
+    function getMyUniversity(uint256 userId) public view virtual returns (euint8) {
         if (!registered[userId]) revert DiplomaNotRegistered();
         return diplomaRecords[userId].university;
     }
@@ -122,35 +122,21 @@ contract Diploma is AccessControl {
     }
 
     // Function to check if a diploma is registered for a user
-    function hasDiploma(uint256 userId) public view returns (bool) {
+    function hasDiploma(uint256 userId) public view virtual returns (bool) {
         return registered[userId];
     }
+
     // Function to generate a claim for a diploma
-    function generateClaim(address claimAddress, string memory claimFn, string[] memory fields) public {
+    function generateClaim(address claimAddress, string memory claimFn) public {
         // Only the msg.sender that is registered under the user ID can make the claim
         uint256 userId = idMapping.getId(msg.sender);
         if (userId == INVALID_ID) revert InvalidUserId();
 
-        // Grant temporary access for each requested field
-        for (uint i = 0; i < fields.length; i++) {
-            if (bytes(fields[i]).length == 0) revert InvalidField();
+        // Grant temporary access for graduate's data to be used in claim generation
+        TFHE.allowTransient(diplomaRecords[userId].degree, claimAddress);
 
-            if (keccak256(bytes(fields[i])) == keccak256(bytes("university"))) {
-                TFHE.allowTransient(diplomaRecords[userId].university, claimAddress);
-                // Ensure the sender can access this university's data
-                if (!TFHE.isSenderAllowed(diplomaRecords[userId].university)) revert AccessNotPermitted();
-            } else if (keccak256(bytes(fields[i])) == keccak256(bytes("degree"))) {
-                TFHE.allowTransient(diplomaRecords[userId].degree, claimAddress);
-                // Ensure the sender can access this university's data
-                if (!TFHE.isSenderAllowed(diplomaRecords[userId].university)) revert AccessNotPermitted();
-            } else if (keccak256(bytes(fields[i])) == keccak256(bytes("grade"))) {
-                TFHE.allowTransient(diplomaRecords[userId].grade, claimAddress);
-                // Ensure the sender can access this university's data
-                if (!TFHE.isSenderAllowed(diplomaRecords[userId].university)) revert AccessNotPermitted();
-            } else {
-                revert InvalidField();
-            }
-        }
+        // Ensure the sender can access this graduate's data
+        if (!TFHE.isSenderAllowed(diplomaRecords[userId].degree)) revert AccessNotPermitted();
 
         // Attempt the external call and capture the result
         (bool success, bytes memory data) = claimAddress.call(abi.encodeWithSignature(claimFn, userId, address(this)));

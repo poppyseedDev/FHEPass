@@ -9,7 +9,7 @@ describe("IdMapping Contract", function () {
   let idMapping: IdMapping;
 
   before(async function () {
-    await initSigners();
+    await initSigners(2);
     this.signers = await getSigners();
   });
 
