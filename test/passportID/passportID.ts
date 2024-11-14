@@ -21,7 +21,7 @@ describe("PassportID and EmployerClaim Contracts", function () {
 
   // Initialize signers before running tests
   before(async function () {
-    await initSigners();
+    await initSigners(2);
     this.signers = await getSigners();
   });
 
@@ -53,7 +53,7 @@ describe("PassportID and EmployerClaim Contracts", function () {
     birthdate = 1234n,
   ) {
     const input = instance.createEncryptedInput(passportAddress, signer.address);
-    const encryptedData = input.add8(biodata).add8(firstname).add8(lastname).add64(birthdate).encrypt();
+    const encryptedData = await input.add8(biodata).add8(firstname).add8(lastname).add64(birthdate).encrypt();
 
     await passportID
       .connect(signer)
@@ -134,7 +134,7 @@ describe("PassportID and EmployerClaim Contracts", function () {
 
     const tx = await passportID
       .connect(this.signers.alice)
-      .generateClaim(this.employerClaimAddress, "generateAdultClaim(uint256,address)", ["birthdate"]);
+      .generateClaim(this.employerClaimAddress, "generateAdultClaim(uint256,address)");
 
     await expect(tx).to.emit(employerClaim, "AdultClaimGenerated");
 

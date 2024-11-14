@@ -38,6 +38,7 @@ contract EmployerClaim is Ownable2Step {
 
     // Constructor to initialize the contract with IdMapping address
     constructor(address _idMappingAddress) Ownable(msg.sender) {
+        TFHE.setFHEVM(FHEVMConfig.defaultConfig());
         if (_idMappingAddress == address(0)) revert InvalidContractAddress();
         idMapping = IdMapping(_idMappingAddress);
     }
