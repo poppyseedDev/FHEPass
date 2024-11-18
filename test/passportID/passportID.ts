@@ -158,4 +158,20 @@ describe("PassportID and EmployerClaim Contracts", function () {
 
     expect(reencryptedFirstname).to.equal(1);
   });
+
+  // Test case: Should fail verification with invalid claim IDs
+  it("should fail verification with invalid claim IDs", async function () {
+    await idMapping.connect(this.signers.alice).generateId();
+    const userId = await idMapping.getId(this.signers.alice);
+
+    await expect(employerClaim.connect(this.signers.alice).verifyClaims(userId, 0, 1)).to.be.revertedWithCustomError(
+      employerClaim,
+      "InvalidClaimId",
+    );
+
+    await expect(employerClaim.connect(this.signers.alice).verifyClaims(userId, 1, 0)).to.be.revertedWithCustomError(
+      employerClaim,
+      "InvalidClaimId",
+    );
+  });
 });

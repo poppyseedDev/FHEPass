@@ -5,22 +5,26 @@ import "fhevm/lib/TFHE.sol";
 import "./IdMapping.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 
+/**
+ * @title Diploma
+ * @author ZAMA
+ * @dev Contract for managing encrypted diploma records using TFHE encryption
+ * @notice Allows universities to register encrypted diploma data and graduates to generate claims
+ */
 contract Diploma is AccessControl {
-    // Constants
-    uint256 private constant INVALID_ID = 0;
+    /// @dev Constants
     bytes32 public constant REGISTRAR_ROLE = keccak256("REGISTRAR_ROLE");
 
-    // Custom errors
+    /// @dev Custom errors
     error OnlyRegistrarAllowed();
     error InvalidRegistrarAddress();
-    error InvalidUserId();
     error DiplomaAlreadyRegistered();
     error DiplomaNotRegistered();
     error AccessNotPermitted();
     error ClaimGenerationFailed(bytes data);
     error CannotRemoveOwnerAsRegistrar();
 
-    // Structure to hold encrypted diploma data
+    /// @dev Structure to hold encrypted diploma data
     struct DiplomaData {
         euint64 id; // Encrypted unique diploma ID
         euint8 university; // Encrypted university identifier
@@ -28,20 +32,23 @@ contract Diploma is AccessControl {
         euint8 grade; // Encrypted grade
     }
 
-    // Instance of IdMapping contract
+    /// @dev Instance of IdMapping contract
     IdMapping private idMapping;
 
-    // Mapping to store diploma records by user ID
+    /// @dev Mapping to store diploma records by user ID
     mapping(uint256 => DiplomaData) private diplomaRecords;
-    // Mapping to track registered diplomas
+    /// @dev Mapping to track registered diplomas
     mapping(uint256 => bool) public registered;
 
-    // Event emitted when a diploma is registered
+    /// @dev Event emitted when a diploma is registered
     event DiplomaRegistered(address indexed graduate);
-    // Event emitted when a claim is generated
+    /// @dev Event emitted when a claim is generated
     event ClaimGenerated(address indexed graduate, address claimAddress, string claimFn);
 
-    // Constructor to initialize the contract with IdMapping address
+    /**
+     * @dev Constructor to initialize the contract with IdMapping address
+     * @param _idMappingAddress Address of the IdMapping contract
+     */
     constructor(address _idMappingAddress) {
         TFHE.setFHEVM(FHEVMConfig.defaultConfig()); // Set up the FHEVM configuration for this contract
         idMapping = IdMapping(_idMappingAddress);
@@ -49,17 +56,31 @@ contract Diploma is AccessControl {
         _grantRole(REGISTRAR_ROLE, msg.sender); // Registrar role for contract owner
     }
 
-    // Function to add a new registrar, only callable by the admin
+    /**
+     * @dev Adds a new registrar address
+     * @param registrar Address to be granted registrar role
+     */
     function addRegistrar(address registrar) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _grantRole(REGISTRAR_ROLE, registrar);
     }
 
-    // Function to remove a registrar, only callable by the admin
+    /**
+     * @dev Removes a registrar address
+     * @param registrar Address to be revoked registrar role
+     */
     function removeRegistrar(address registrar) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _revokeRole(REGISTRAR_ROLE, registrar);
     }
 
-    // Function to register a diploma, only callable by a registrar
+    /**
+     * @dev Registers a new encrypted diploma for a user
+     * @param userId ID of the user to register diploma for
+     * @param university Encrypted university identifier
+     * @param degree Encrypted degree type
+     * @param grade Encrypted grade
+     * @param inputProof Proof for encrypted inputs
+     * @return bool indicating success
+     */
     function registerDiploma(
         uint256 userId,
         einput university,
@@ -67,7 +88,6 @@ contract Diploma is AccessControl {
         einput grade,
         bytes calldata inputProof
     ) public virtual onlyRole(DEFAULT_ADMIN_ROLE) returns (bool) {
-        if (userId == INVALID_ID) revert InvalidUserId();
         if (registered[userId]) revert DiplomaAlreadyRegistered();
 
         // Generate a new encrypted diploma ID
@@ -103,45 +123,64 @@ contract Diploma is AccessControl {
         return true;
     }
 
-    // Function to get the encrypted university identifier for a user
+    /**
+     * @dev Retrieves encrypted university identifier for a user
+     * @param userId ID of the user to get university for
+     * @return euint8 Encrypted university identifier
+     */
     function getMyUniversity(uint256 userId) public view virtual returns (euint8) {
         if (!registered[userId]) revert DiplomaNotRegistered();
         return diplomaRecords[userId].university;
     }
 
-    // Function to get the encrypted degree type for a user
+    /**
+     * @dev Retrieves encrypted degree type for a user
+     * @param userId ID of the user to get degree for
+     * @return euint8 Encrypted degree type
+     */
     function getMyDegree(uint256 userId) public view virtual returns (euint8) {
         if (!registered[userId]) revert DiplomaNotRegistered();
         return diplomaRecords[userId].degree;
     }
 
-    // Function to get the encrypted grade for a user
+    /**
+     * @dev Retrieves encrypted grade for a user
+     * @param userId ID of the user to get grade for
+     * @return euint8 Encrypted grade
+     */
     function getMyGrade(uint256 userId) public view virtual returns (euint8) {
         if (!registered[userId]) revert DiplomaNotRegistered();
         return diplomaRecords[userId].grade;
     }
 
-    // Function to check if a diploma is registered for a user
+    /**
+     * @dev Checks if a diploma is registered for a user
+     * @param userId ID of the user to check
+     * @return bool indicating if diploma exists
+     */
     function hasDiploma(uint256 userId) public view virtual returns (bool) {
         return registered[userId];
     }
 
-    // Function to generate a claim for a diploma
+    /**
+     * @dev Generates a claim for a diploma
+     * @param claimAddress Address of the claim contract
+     * @param claimFn Function signature to call on claim contract
+     */
     function generateClaim(address claimAddress, string memory claimFn) public {
-        // Only the msg.sender that is registered under the user ID can make the claim
+        /// @dev Only the msg.sender that is registered under the user ID can make the claim
         uint256 userId = idMapping.getId(msg.sender);
-        if (userId == INVALID_ID) revert InvalidUserId();
 
-        // Grant temporary access for graduate's data to be used in claim generation
+        /// @dev Grant temporary access for graduate's data to be used in claim generation
         TFHE.allowTransient(diplomaRecords[userId].degree, claimAddress);
 
-        // Ensure the sender can access this graduate's data
+        /// @dev Ensure the sender can access this graduate's data
         if (!TFHE.isSenderAllowed(diplomaRecords[userId].degree)) revert AccessNotPermitted();
 
-        // Attempt the external call and capture the result
+        /// @dev Attempt the external call and capture the result
         (bool success, bytes memory data) = claimAddress.call(abi.encodeWithSignature(claimFn, userId));
         if (!success) revert ClaimGenerationFailed(data);
 
-        emit ClaimGenerated(msg.sender, claimAddress, claimFn); // Emit event for claim generation
+        emit ClaimGenerated(msg.sender, claimAddress, claimFn); /// @dev Emit event for claim generation
     }
 }

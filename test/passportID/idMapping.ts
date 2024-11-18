@@ -51,4 +51,55 @@ describe("IdMapping Contract", function () {
     // Verify getting an invalid ID reverts
     await expect(idMapping.getAddr(999)).to.be.revertedWithCustomError(idMapping, "InvalidId");
   });
+
+  it("Should not allow generating multiple IDs for same address", async function () {
+    await idMapping.connect(this.signers.alice).generateId();
+    await expect(idMapping.connect(this.signers.alice).generateId()).to.be.revertedWithCustomError(
+      idMapping,
+      "IdAlreadyGenerated",
+    );
+  });
+
+  it("Should fail when getting ID for zero address", async function () {
+    await expect(idMapping.getId(ethers.ZeroAddress)).to.be.revertedWithCustomError(idMapping, "InvalidAddress");
+  });
+
+  it("Should fail when getting ID for unregistered address", async function () {
+    await expect(idMapping.getId(this.signers.alice.address)).to.be.revertedWithCustomError(idMapping, "NoIdGenerated");
+  });
+
+  it("Should fail when getting address for invalid ID", async function () {
+    await expect(idMapping.getAddr(0)).to.be.revertedWithCustomError(idMapping, "InvalidId");
+
+    await expect(idMapping.getAddr(999)).to.be.revertedWithCustomError(idMapping, "InvalidId");
+  });
+
+  it("Should allow owner to reset ID for an address", async function () {
+    // Generate ID first
+    await idMapping.connect(this.signers.alice).generateId();
+    const userId = await idMapping.getId(this.signers.alice.address);
+
+    // Reset ID
+    await idMapping.resetIdForAddress(this.signers.alice.address);
+
+    // Verify ID is reset
+    await expect(idMapping.getId(this.signers.alice.address)).to.be.revertedWithCustomError(idMapping, "NoIdGenerated");
+
+    await expect(idMapping.getAddr(userId)).to.be.revertedWithCustomError(idMapping, "NoAddressFound");
+  });
+
+  it("Should not allow non-owner to reset ID", async function () {
+    await idMapping.connect(this.signers.alice).generateId();
+
+    await expect(
+      idMapping.connect(this.signers.bob).resetIdForAddress(this.signers.alice.address),
+    ).to.be.revertedWithCustomError(idMapping, "OwnableUnauthorizedAccount");
+  });
+
+  it("Should not allow resetting ID for unregistered address", async function () {
+    await expect(idMapping.resetIdForAddress(this.signers.alice.address)).to.be.revertedWithCustomError(
+      idMapping,
+      "NoIdGenerated",
+    );
+  });
 });

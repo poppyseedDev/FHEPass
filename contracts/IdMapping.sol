@@ -1,10 +1,16 @@
-// SPDX-License-Identifier: MIT
+/// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/access/Ownable2Step.sol";
 
+/**
+ * @title IdMapping
+ * @author ZAMA
+ * @notice Manages unique ID mappings between addresses and sequential IDs
+ * @dev Inherits from Ownable2Step for secure ownership transfer
+ */
 contract IdMapping is Ownable2Step {
-    // Custom errors
+    /// Custom errors
     error IdAlreadyGenerated();
     error InvalidAddress();
     error IdOverflow();
@@ -12,74 +18,92 @@ contract IdMapping is Ownable2Step {
     error InvalidId();
     error NoAddressFound();
 
-    // Mapping from address to unique ID
+    /// @notice Maps user addresses to their unique IDs
     mapping(address => uint256) public addressToId;
-    // Mapping from unique ID to address
+    /// @dev Maps unique IDs back to user addresses
     mapping(uint256 => address) private idToAddress;
-    // Counter for the next ID to be assigned
+    /// @dev Counter for assigning sequential IDs, starts at 1
     uint256 private nextId = 1;
-    // Maximum allowed ID value
+    /// @dev Maximum possible ID value to prevent overflow
     uint256 private constant MAX_ID = type(uint256).max;
 
-    // Event emitted when a new ID is generated for a user
+    /**
+     * @notice Emitted when a new ID is generated for a user
+     * @param user The address of the user receiving the ID
+     * @param id The unique ID assigned to the user
+     */
     event IdGenerated(address indexed user, uint256 indexed id);
 
+    /**
+     * @notice Initializes the contract with the deployer as owner
+     * @dev Sets initial ID counter to 1
+     */
     constructor() Ownable(msg.sender) {
-        // Initialize the counter to start from 1
         nextId = 1;
     }
 
-    // Function to generate and set a new ID for an address
+    /**
+     * @notice Generates a unique ID for the calling address
+     * @dev Each address can only generate one ID. IDs are assigned sequentially starting from 1
+     * @return uint256 The newly generated ID
+     * @custom:throws IdAlreadyGenerated if caller already has an ID
+     * @custom:throws InvalidAddress if caller is zero address
+     * @custom:throws IdOverflow if maximum ID value is reached
+     */
     function generateId() public returns (uint256) {
-        // Ensure the caller does not already have an ID
         if (addressToId[msg.sender] != 0) revert IdAlreadyGenerated();
-        // Ensure the caller's address is valid
         if (msg.sender == address(0)) revert InvalidAddress();
-        // Check for overflow before incrementing
         if (nextId >= MAX_ID) revert IdOverflow();
 
-        // Assign the next available ID
         uint256 newId = nextId;
 
-        // Map the caller's address to the new ID
         addressToId[msg.sender] = newId;
-        // Map the new ID to the caller's address
         idToAddress[newId] = msg.sender;
-        // Increment the ID counter for the next user
         nextId++;
 
-        // Emit an event to signal that a new ID has been generated
         emit IdGenerated(msg.sender, newId);
         return newId;
     }
 
-    // Function to retrieve the ID for a given address
+    /**
+     * @notice Looks up the ID associated with a given address
+     * @dev Reverts if address has no ID or is zero address
+     * @param _addr The address to lookup
+     * @return uint256 The ID associated with the address
+     * @custom:throws InvalidAddress if provided address is zero address
+     * @custom:throws NoIdGenerated if address has no ID assigned
+     */
     function getId(address _addr) public view returns (uint256) {
-        // Ensure the provided address is valid
         if (_addr == address(0)) revert InvalidAddress();
-        // Ensure an ID has been generated for the provided address
         if (addressToId[_addr] == 0) revert NoIdGenerated();
         return addressToId[_addr];
     }
 
-    // Function to retrieve the address for a given ID
+    /**
+     * @notice Looks up the address associated with a given ID
+     * @dev Reverts if ID is invalid or has no associated address
+     * @param _id The ID to lookup
+     * @return address The address associated with the ID
+     * @custom:throws InvalidId if ID is 0 or greater than the last assigned ID
+     * @custom:throws NoAddressFound if no address is associated with the ID
+     */
     function getAddr(uint256 _id) public view returns (address) {
-        // Ensure the provided ID is within the valid range
-        if (_id == 0 || _id >= nextId) revert InvalidId();
-        // Retrieve the address associated with the provided ID
+        if (_id <= 0 || _id >= nextId) revert InvalidId();
         address addr = idToAddress[_id];
-        // Ensure an address is found for the provided ID
         if (addr == address(0)) revert NoAddressFound();
         return addr;
     }
 
-    // Owner-only function to reset an address's ID
+    /**
+     * @notice Removes an address's ID mapping
+     * @dev Only callable by contract owner. Removes both address->ID and ID->address mappings
+     * @param _addr The address whose ID mapping should be reset
+     * @custom:throws NoIdGenerated if address has no ID assigned
+     */
     function resetIdForAddress(address _addr) external onlyOwner {
-        // Ensure the provided address is valid and has an ID
         uint256 id = addressToId[_addr];
         if (id == 0) revert NoIdGenerated();
 
-        // Reset mappings
         delete addressToId[_addr];
         delete idToAddress[id];
     }

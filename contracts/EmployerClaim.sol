@@ -2,44 +2,67 @@
 pragma solidity ^0.8.19;
 
 import "fhevm/lib/TFHE.sol";
-import "./PassportID.sol"; // Import PassportID contract
+import "./PassportID.sol";
 import "./Diploma.sol";
 import "@openzeppelin/contracts/access/Ownable2Step.sol";
 
+/**
+ * @title EmployerClaim
+ * @author ZAMA
+ * @dev Contract for managing encrypted claims about users' age and education credentials
+ * @notice Allows generation and verification of encrypted claims for employment verification
+ */
 contract EmployerClaim is Ownable2Step {
-    // Constants
-    uint64 private constant AGE_THRESHOLD_TIMESTAMP = 1704067200; // Jan 1, 2024 - 18 years
+    /// @dev Age threshold timestamp for adult verification (Jan 1, 2024 - 18 years)
+    uint64 private constant AGE_THRESHOLD_TIMESTAMP = 1704067200;
+    /// @dev Required degree level for education verification
     uint8 private constant REQUIRED_DEGREE_LEVEL = 1;
-    uint256 private constant INVALID_ID = 0;
+    /// @dev Constant representing an invalid claim ID
     uint256 private constant INVALID_CLAIM = 0;
 
-    // Custom errors
+    /// @dev Error thrown when a non-user attempts to generate a claim
     error OnlyUserCanGenerateClaim();
+    /// @dev Error thrown when an invalid claim ID is provided
     error InvalidClaimId();
-    error InvalidUserId();
+    /// @dev Error thrown when an invalid contract address is provided
     error InvalidContractAddress();
+    /// @dev Error thrown when unauthorized access is attempted
     error UnauthorizedAccess();
+    /// @dev Error thrown when caller is not authorized
     error NotAuthorized();
 
+    /// @dev Counter for tracking the latest claim ID
     uint64 public lastClaimId = 0;
-    // Mapping of claim IDs to boolean results for adult claims
+    /// @dev Mapping of claim IDs to encrypted boolean results for adult claims
     mapping(uint64 => ebool) public adultClaims;
-    // Mapping of claim IDs to boolean results for degree claims
+    /// @dev Mapping of claim IDs to encrypted boolean results for degree claims
     mapping(uint64 => ebool) public degreeClaims;
-    // Mapping of user IDs to boolean results for verified claims
+    /// @dev Mapping of user IDs to encrypted boolean results for verified claims
     mapping(uint256 => ebool) public verifiedClaims;
 
-    // Event emitted when an adult claim is generated
+    /// @dev Emitted when an adult claim is generated
+    /// @param claimId The ID of the generated claim
+    /// @param userId The ID of the user the claim is for
     event AdultClaimGenerated(uint64 claimId, uint256 userId);
-    // Event emitted when a degree claim is generated
+    /// @dev Emitted when a degree claim is generated
+    /// @param claimId The ID of the generated claim
+    /// @param userId The ID of the user the claim is for
     event DegreeClaimGenerated(uint64 claimId, uint256 userId);
 
-    // Instance of IdMapping contract
+    /// @dev Instance of IdMapping contract for user ID management
     IdMapping private idMapping;
+    /// @dev Instance of PassportID contract for identity verification
     PassportID private passportContract;
+    /// @dev Instance of Diploma contract for education verification
     Diploma private diplomaContract;
 
-    // Constructor to initialize the contract with IdMapping address
+    /**
+     * @dev Constructor to initialize the contract with required contract addresses
+     * @param _idMappingAddress Address of the IdMapping contract
+     * @param _passportAddress Address of the PassportID contract
+     * @param _diplomaAddress Address of the Diploma contract
+     * @custom:throws InvalidContractAddress if any address is zero
+     */
     constructor(address _idMappingAddress, address _passportAddress, address _diplomaAddress) Ownable(msg.sender) {
         TFHE.setFHEVM(FHEVMConfig.defaultConfig());
         if (_idMappingAddress == address(0) || _passportAddress == address(0) || _diplomaAddress == address(0))
@@ -50,85 +73,111 @@ contract EmployerClaim is Ownable2Step {
         diplomaContract = Diploma(_diplomaAddress);
     }
 
-    // Generate an age claim to verify if a user is above a certain age (e.g., 18)
+    /**
+     * @dev Generates an encrypted claim verifying if a user is above 18 years old
+     * @param userId The ID of the user to generate the claim for
+     * @return The ID of the generated claim
+     * @custom:throws NotAuthorized if caller is not the passport contract
+     * @custom:emits AdultClaimGenerated when claim is generated
+     */
     function generateAdultClaim(uint256 userId) public returns (uint64) {
         if (msg.sender != address(passportContract)) revert NotAuthorized();
-        if (userId == INVALID_ID) revert InvalidUserId();
 
-        // Retrieve the address associated with the user ID
+        /// Retrieve the address associated with the user ID
         address addressToBeAllowed = idMapping.getAddr(userId);
 
-        // Retrieve the user's encrypted birthdate from the PassportID contract
+        /// Retrieve the user's encrypted birthdate from the PassportID contract
         euint64 birthdate = passportContract.getBirthdate(userId);
 
-        // Set age threshold to 18 years (in Unix timestamp)
+        /// Set age threshold to 18 years (in Unix timestamp)
         euint64 ageThreshold = TFHE.asEuint64(AGE_THRESHOLD_TIMESTAMP);
 
         lastClaimId++;
 
-        // Check if birthdate indicates user is over 18
+        /// Check if birthdate indicates user is over 18
         ebool isAdult = TFHE.le(birthdate, ageThreshold);
 
-        // Store the result of the claim
+        /// Store the result of the claim
         adultClaims[lastClaimId] = isAdult;
 
-        // Grant access to the claim to both the contract and user for verification purposes
+        /// Grant access to the claim to both the contract and user for verification purposes
         TFHE.allow(isAdult, address(this));
         TFHE.allow(isAdult, addressToBeAllowed);
 
-        // Emit an event for the generated claim
+        /// Emit an event for the generated claim
         emit AdultClaimGenerated(lastClaimId, userId);
 
         return lastClaimId;
     }
 
-    // Retrieve the result of an adult claim using the claim ID
+    /**
+     * @dev Retrieves the result of an adult claim
+     * @param claimId The ID of the claim to retrieve
+     * @return The encrypted boolean result of the claim
+     * @custom:throws InvalidClaimId if claim ID is invalid
+     */
     function getAdultClaim(uint64 claimId) public view returns (ebool) {
         if (claimId == 0 || claimId > lastClaimId) revert InvalidClaimId();
         return adultClaims[claimId];
     }
 
-    // Generate a claim to verify if a user has a specific degree from a specific university
+    /**
+     * @dev Generates an encrypted claim verifying if a user has required degree credentials
+     * @param userId The ID of the user to generate the claim for
+     * @return The ID of the generated claim
+     * @custom:throws NotAuthorized if caller is not the diploma contract
+     * @custom:emits DegreeClaimGenerated when claim is generated
+     */
     function generateDegreeClaim(uint256 userId) public returns (uint64) {
         if (msg.sender != address(diplomaContract)) revert NotAuthorized();
-        if (userId == INVALID_ID) revert InvalidUserId();
 
-        // Retrieve the address associated with the user ID
+        /// Retrieve the address associated with the user ID
         address addressToBeAllowed = idMapping.getAddr(userId);
 
-        // Get the diploma data from the Diploma contract
+        /// Get the diploma data from the Diploma contract
         euint8 userUniversity = diplomaContract.getMyDegree(userId);
 
         lastClaimId++;
 
-        // Use constant for required degree
+        /// Use constant for required degree
         euint8 requiredDegree = TFHE.asEuint8(REQUIRED_DEGREE_LEVEL);
 
-        // Check if university and degree match requirements
+        /// Check if university and degree match requirements
         ebool degreeMatch = TFHE.eq(userUniversity, requiredDegree);
 
-        // Store the result of the claim
+        /// Store the result of the claim
         degreeClaims[lastClaimId] = degreeMatch;
 
-        // Grant access to the claim
+        /// Grant access to the claim
         TFHE.allow(degreeMatch, address(this));
         TFHE.allow(degreeMatch, addressToBeAllowed);
 
-        // Emit an event for the generated claim
+        /// Emit an event for the generated claim
         emit DegreeClaimGenerated(lastClaimId, userId);
 
         return lastClaimId;
     }
 
-    // Retrieve the result of a degree claim using the claim ID
+    /**
+     * @dev Retrieves the result of a degree claim
+     * @param claimId The ID of the claim to retrieve
+     * @return The encrypted boolean result of the claim
+     * @custom:throws InvalidClaimId if claim ID is invalid
+     */
     function getDegreeClaim(uint64 claimId) public view returns (ebool) {
         if (claimId == 0 || claimId > lastClaimId) revert InvalidClaimId();
         return degreeClaims[claimId];
     }
 
-    // Function to verify if both adult and degree claims are true for a user
+    /**
+     * @dev Verifies both adult and degree claims for a user
+     * @param userId The ID of the user to verify claims for
+     * @param adultClaim The ID of the adult claim to verify
+     * @param degreeClaim The ID of the degree claim to verify
+     * @custom:throws InvalidClaimId if either claim ID is invalid
+     * @notice This function combines adult and degree claims into a single verification
+     */
     function verifyClaims(uint256 userId, uint64 adultClaim, uint64 degreeClaim) public {
-        if (userId == INVALID_ID) revert InvalidUserId();
         if (adultClaim == INVALID_CLAIM || adultClaim > lastClaimId) revert InvalidClaimId();
         if (degreeClaim == INVALID_CLAIM || degreeClaim > lastClaimId) revert InvalidClaimId();
 
@@ -137,20 +186,24 @@ contract EmployerClaim is Ownable2Step {
 
         ebool verify = TFHE.and(isAdult, hasDegree);
 
-        // Store the verification result under the userId mapping
+        /// Store the verification result under the userId mapping
         verifiedClaims[userId] = verify;
 
-        // Retrieve the address associated with the user ID
+        /// Retrieve the address associated with the user ID
         address addressToBeAllowed = idMapping.getAddr(userId);
 
-        // Grant access to the claim
+        /// Grant access to the claim
         TFHE.allow(verify, address(this));
         TFHE.allow(verify, addressToBeAllowed);
     }
 
-    // Retrieve the result of a degree claim using the claim ID
+    /**
+     * @dev Retrieves the result of a verified claim for a user
+     * @param userId The ID of the user to get the verified claim for
+     * @return The encrypted boolean result of the verified claim
+     * @notice Returns the combined verification status of adult and degree claims
+     */
     function getVerifyClaim(uint256 userId) public view returns (ebool) {
-        if (userId == 0) revert InvalidUserId();
         return verifiedClaims[userId];
     }
 }
