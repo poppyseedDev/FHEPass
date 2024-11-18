@@ -19,6 +19,7 @@ contract EmployerClaim is Ownable2Step {
     error InvalidUserId();
     error InvalidContractAddress();
     error UnauthorizedAccess();
+    error NotAuthorized();
 
     uint64 public lastClaimId = 0;
     // Mapping of claim IDs to boolean results for adult claims
@@ -51,6 +52,7 @@ contract EmployerClaim is Ownable2Step {
 
     // Generate an age claim to verify if a user is above a certain age (e.g., 18)
     function generateAdultClaim(uint256 userId) public returns (uint64) {
+        if (msg.sender != address(passportContract)) revert NotAuthorized();
         if (userId == INVALID_ID) revert InvalidUserId();
 
         // Retrieve the address associated with the user ID
@@ -88,6 +90,7 @@ contract EmployerClaim is Ownable2Step {
 
     // Generate a claim to verify if a user has a specific degree from a specific university
     function generateDegreeClaim(uint256 userId) public returns (uint64) {
+        if (msg.sender != address(diplomaContract)) revert NotAuthorized();
         if (userId == INVALID_ID) revert InvalidUserId();
 
         // Retrieve the address associated with the user ID
