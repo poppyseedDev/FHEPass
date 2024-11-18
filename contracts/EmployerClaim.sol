@@ -13,10 +13,10 @@ import "@openzeppelin/contracts/access/Ownable2Step.sol";
  * @notice Allows generation and verification of encrypted claims for employment verification
  */
 contract EmployerClaim is Ownable2Step {
-    /// @dev Age threshold timestamp for adult verification (Jan 1, 2024 - 18 years)
-    uint64 private constant AGE_THRESHOLD_TIMESTAMP = 1704067200;
-    /// @dev Required degree level for education verification
-    uint8 private constant REQUIRED_DEGREE_LEVEL = 1;
+    /// @dev Age threshold timestamp for adult verification (Jan 1, 2006 - 18 years on Jan 1, 2024)
+    uint64 private constant AGE_THRESHOLD_TIMESTAMP = 1136070000;
+    /// @dev Required degree level for education verification (Computer Science (B.Sc))
+    uint16 private constant REQUIRED_DEGREE_LEVEL = 3;
     /// @dev Constant representing an invalid claim ID
     uint256 private constant INVALID_CLAIM = 0;
 
@@ -135,12 +135,12 @@ contract EmployerClaim is Ownable2Step {
         address addressToBeAllowed = idMapping.getAddr(userId);
 
         /// Get the diploma data from the Diploma contract
-        euint8 userUniversity = diplomaContract.getMyDegree(userId);
+        euint16 userUniversity = diplomaContract.getMyDegree(userId);
 
         lastClaimId++;
 
         /// Use constant for required degree
-        euint8 requiredDegree = TFHE.asEuint8(REQUIRED_DEGREE_LEVEL);
+        euint16 requiredDegree = TFHE.asEuint16(REQUIRED_DEGREE_LEVEL);
 
         /// Check if university and degree match requirements
         ebool degreeMatch = TFHE.eq(userUniversity, requiredDegree);

@@ -6,6 +6,7 @@ import type { FhevmInstance } from "fhevmjs";
 import type { Diploma, EmployerClaim, IdMapping, PassportID } from "../../types";
 import { createInstances } from "../instance";
 import { getSigners, initSigners } from "../signers";
+import { bigIntToBytes64 } from "../utils";
 import { deployEmployerClaimFixture } from "./fixture/EmployerClaim.fixture";
 
 /**
@@ -63,12 +64,12 @@ describe("PassportID and EmployerClaim Contracts", function () {
     instance: FhevmInstance,
     diplomaAddress: string,
     signer: HardhatEthersSigner,
-    university = 8,
+    university = bigIntToBytes64(8n),
     degree = 8,
-    grade = 8,
+    grade = bigIntToBytes64(8n),
   ) {
     const input = instance.createEncryptedInput(diplomaAddress, signer.address);
-    const encryptedData = await input.add8(university).add8(degree).add8(grade).encrypt();
+    const encryptedData = await input.addBytes64(university).add16(degree).addBytes64(grade).encrypt();
 
     await diplomaID
       .connect(signer)
@@ -100,19 +101,28 @@ describe("PassportID and EmployerClaim Contracts", function () {
     instance: FhevmInstance,
     passportAddress: string,
     signer: HardhatEthersSigner,
+    biodata = bigIntToBytes64(8n),
+    firstname = bigIntToBytes64(8n),
+    lastname = bigIntToBytes64(8n),
+    birthdate = 946681200n, // Sat Jan 01 2000 - 24 years old
   ) {
-    const identityInput = instance.createEncryptedInput(passportAddress, signer.address);
-    const identityEncryptedData = await identityInput.add8(8).add8(8).add8(8).add64(1234).encrypt();
+    const input = instance.createEncryptedInput(passportAddress, signer.address);
+    const encryptedData = await input
+      .addBytes64(biodata)
+      .addBytes64(firstname)
+      .addBytes64(lastname)
+      .add64(birthdate)
+      .encrypt();
 
     await passportID
       .connect(signer)
       .registerIdentity(
         userId,
-        identityEncryptedData.handles[0],
-        identityEncryptedData.handles[1],
-        identityEncryptedData.handles[2],
-        identityEncryptedData.handles[3],
-        identityEncryptedData.inputProof,
+        encryptedData.handles[0],
+        encryptedData.handles[1],
+        encryptedData.handles[2],
+        encryptedData.handles[3],
+        encryptedData.inputProof,
       );
   }
 
@@ -167,7 +177,7 @@ describe("PassportID and EmployerClaim Contracts", function () {
     await idMapping.connect(this.signers.alice).generateId();
     const userId = await idMapping.getId(this.signers.alice);
 
-    await registerDiploma(userId, this.instances.alice, this.diplomaAddress, this.signers.alice, 8, 8, 8);
+    await registerDiploma(userId, this.instances.alice, this.diplomaAddress, this.signers.alice);
 
     const tx = await diplomaID
       .connect(this.signers.alice)
@@ -201,7 +211,15 @@ describe("PassportID and EmployerClaim Contracts", function () {
     await idMapping.connect(this.signers.alice).generateId();
     const userId = await idMapping.getId(this.signers.alice);
 
-    await registerDiploma(userId, this.instances.alice, this.diplomaAddress, this.signers.alice, 8, 1, 8);
+    await registerDiploma(
+      userId,
+      this.instances.alice,
+      this.diplomaAddress,
+      this.signers.alice,
+      bigIntToBytes64(8n),
+      3, // Computer Science (B.Sc)
+      bigIntToBytes64(8n),
+    );
 
     const degreeTx = await diplomaID
       .connect(this.signers.alice)

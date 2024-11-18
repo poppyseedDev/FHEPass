@@ -43,6 +43,38 @@ Then create a `.env` file to store environment variables (see `.env.example` for
    pnpm fhevm:stop
    ```
 
+### Degree mapping
+```
+degree_mapping = {
+    "0001": "Electrical Engineering (B.Eng)",
+    "0002": "Mechanical Engineering (B.Eng)",
+    "0003": "Computer Science (B.Sc)",
+    "0004": "Civil Engineering (B.Eng)",
+    "0005": "Chemical Engineering (B.Eng)",
+    "0006": "Business Administration (BBA)",
+    "0007": "Psychology (B.A)",
+    "0008": "Biology (B.Sc)",
+    "0009": "Mathematics (B.Sc)",
+    "0010": "Physics (B.Sc)",
+    "0011": "Architecture (B.Arch)",
+    "0012": "Medicine (MBBS)",
+    "0013": "Law (LLB)",
+    "0014": "Nursing (B.Sc)",
+    "0015": "Economics (B.A)",
+    # Graduate Degrees
+    "1001": "Electrical Engineering (M.Eng)",
+    "1002": "Mechanical Engineering (M.Eng)",
+    "1003": "Computer Science (M.Sc)",
+    "1004": "Business Administration (MBA)",
+    "1005": "Data Science (M.Sc)",
+    # Doctoral Degrees
+    "2001": "Electrical Engineering (Ph.D)",
+    "2002": "Computer Science (Ph.D)",
+    "2003": "Physics (Ph.D)",
+    "2004": "Business Administration (DBA)"
+}
+```
+
 ## Contract Overview
 
 The DID contract manages core identity data and allows the creation of encrypted identity claims for external verification. An example structure for the `DID` and `EmployerClaim` contracts is as follows:

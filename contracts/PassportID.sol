@@ -34,9 +34,9 @@ contract PassportID is AccessControl {
      */
     struct Identity {
         euint64 id; /// @dev Encrypted unique ID
-        euint8 biodata; /// @dev Encrypted biodata (e.g., biometric data or hashed identity data)
-        euint8 firstname; /// @dev Encrypted first name
-        euint8 lastname; /// @dev Encrypted last name
+        ebytes64 biodata; /// @dev Encrypted biodata (e.g., biometric data or hashed identity data)
+        ebytes64 firstname; /// @dev Encrypted first name
+        ebytes64 lastname; /// @dev Encrypted last name
         euint64 birthdate; /// @dev Encrypted birthdate for age verification
     }
 
@@ -109,9 +109,9 @@ contract PassportID is AccessControl {
         /// @dev Store the encrypted identity data
         citizenIdentities[userId] = Identity({
             id: newId,
-            biodata: TFHE.asEuint8(biodata, inputProof),
-            firstname: TFHE.asEuint8(firstname, inputProof),
-            lastname: TFHE.asEuint8(lastname, inputProof),
+            biodata: TFHE.asEbytes64(biodata, inputProof),
+            firstname: TFHE.asEbytes64(firstname, inputProof),
+            lastname: TFHE.asEbytes64(lastname, inputProof),
             birthdate: TFHE.asEuint64(birthdate, inputProof)
         });
 
@@ -146,7 +146,7 @@ contract PassportID is AccessControl {
      * @return Tuple containing (id, biodata, firstname, lastname, birthdate)
      * @custom:throws IdentityNotRegistered if no identity exists for userId
      */
-    function getIdentity(uint256 userId) public view virtual returns (euint64, euint8, euint8, euint8, euint64) {
+    function getIdentity(uint256 userId) public view virtual returns (euint64, ebytes64, ebytes64, ebytes64, euint64) {
         if (!registered[userId]) revert IdentityNotRegistered();
         return (
             citizenIdentities[userId].id,
@@ -176,7 +176,7 @@ contract PassportID is AccessControl {
      * @return Encrypted first name as euint8
      * @custom:throws IdentityNotRegistered if no identity exists for userId
      */
-    function getMyIdentityFirstname(uint256 userId) public view virtual returns (euint8) {
+    function getMyIdentityFirstname(uint256 userId) public view virtual returns (ebytes64) {
         if (!registered[userId]) revert IdentityNotRegistered();
         return citizenIdentities[userId].firstname;
     }
