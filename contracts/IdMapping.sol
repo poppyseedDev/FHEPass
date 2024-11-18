@@ -11,11 +11,17 @@ import "@openzeppelin/contracts/access/Ownable2Step.sol";
  */
 contract IdMapping is Ownable2Step {
     /// Custom errors
+    /// @notice Thrown when attempting to generate an ID for an address that already has one
     error IdAlreadyGenerated();
+    /// @notice Thrown when attempting to use the zero address
     error InvalidAddress();
+    /// @notice Thrown when the maximum ID value has been reached
     error IdOverflow();
+    /// @notice Thrown when trying to look up an ID for an address that hasn't generated one
     error NoIdGenerated();
+    /// @notice Thrown when attempting to use an ID that doesn't exist
     error InvalidId();
+    /// @notice Thrown when no address is found for a given ID
     error NoAddressFound();
 
     /// @notice Maps user addresses to their unique IDs
@@ -24,8 +30,6 @@ contract IdMapping is Ownable2Step {
     mapping(uint256 => address) private idToAddress;
     /// @dev Counter for assigning sequential IDs, starts at 1
     uint256 private nextId = 1;
-    /// @dev Maximum possible ID value to prevent overflow
-    uint256 private constant MAX_ID = type(uint256).max;
 
     /**
      * @notice Emitted when a new ID is generated for a user
@@ -53,7 +57,6 @@ contract IdMapping is Ownable2Step {
     function generateId() public returns (uint256) {
         if (addressToId[msg.sender] != 0) revert IdAlreadyGenerated();
         if (msg.sender == address(0)) revert InvalidAddress();
-        if (nextId >= MAX_ID) revert IdOverflow();
 
         uint256 newId = nextId;
 

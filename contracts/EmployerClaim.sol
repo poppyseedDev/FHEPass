@@ -19,15 +19,13 @@ contract EmployerClaim is Ownable2Step {
     uint16 private constant REQUIRED_DEGREE_LEVEL = 3;
     /// @dev Constant representing an invalid claim ID
     uint256 private constant INVALID_CLAIM = 0;
+    euint64 private _AGE_THRESHOLD;
+    euint16 private _REQUIRED_DEGREE;
 
-    /// @dev Error thrown when a non-user attempts to generate a claim
-    error OnlyUserCanGenerateClaim();
     /// @dev Error thrown when an invalid claim ID is provided
     error InvalidClaimId();
     /// @dev Error thrown when an invalid contract address is provided
     error InvalidContractAddress();
-    /// @dev Error thrown when unauthorized access is attempted
-    error UnauthorizedAccess();
     /// @dev Error thrown when caller is not authorized
     error NotAuthorized();
 
@@ -71,6 +69,15 @@ contract EmployerClaim is Ownable2Step {
         idMapping = IdMapping(_idMappingAddress);
         passportContract = PassportID(_passportAddress);
         diplomaContract = Diploma(_diplomaAddress);
+
+        /// Set age threshold to 18 years (in Unix timestamp)
+        _AGE_THRESHOLD = TFHE.asEuint64(AGE_THRESHOLD_TIMESTAMP);
+
+        /// Use constant for required degree
+        _REQUIRED_DEGREE = TFHE.asEuint16(REQUIRED_DEGREE_LEVEL);
+
+        TFHE.allowThis(_AGE_THRESHOLD);
+        TFHE.allowThis(_REQUIRED_DEGREE);
     }
 
     /**
@@ -89,13 +96,10 @@ contract EmployerClaim is Ownable2Step {
         /// Retrieve the user's encrypted birthdate from the PassportID contract
         euint64 birthdate = passportContract.getBirthdate(userId);
 
-        /// Set age threshold to 18 years (in Unix timestamp)
-        euint64 ageThreshold = TFHE.asEuint64(AGE_THRESHOLD_TIMESTAMP);
-
         lastClaimId++;
 
         /// Check if birthdate indicates user is over 18
-        ebool isAdult = TFHE.le(birthdate, ageThreshold);
+        ebool isAdult = TFHE.le(birthdate, _AGE_THRESHOLD);
 
         /// Store the result of the claim
         adultClaims[lastClaimId] = isAdult;
@@ -139,11 +143,8 @@ contract EmployerClaim is Ownable2Step {
 
         lastClaimId++;
 
-        /// Use constant for required degree
-        euint16 requiredDegree = TFHE.asEuint16(REQUIRED_DEGREE_LEVEL);
-
         /// Check if university and degree match requirements
-        ebool degreeMatch = TFHE.eq(userUniversity, requiredDegree);
+        ebool degreeMatch = TFHE.eq(userUniversity, _REQUIRED_DEGREE);
 
         /// Store the result of the claim
         degreeClaims[lastClaimId] = degreeMatch;

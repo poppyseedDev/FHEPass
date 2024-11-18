@@ -16,13 +16,15 @@ contract Diploma is AccessControl {
     bytes32 public constant REGISTRAR_ROLE = keccak256("REGISTRAR_ROLE");
 
     /// @dev Custom errors
-    error OnlyRegistrarAllowed();
-    error InvalidRegistrarAddress();
+    /// @notice Thrown when attempting to register a diploma for a user who already has one
     error DiplomaAlreadyRegistered();
+    /// @notice Thrown when attempting to access diploma data for a user who doesn't have one registered
     error DiplomaNotRegistered();
+    /// @notice Thrown when sender doesn't have permission to access the encrypted data
     error AccessNotPermitted();
+    /// @notice Thrown when claim generation fails, includes failure data
+    /// @param data The error data returned from the failed claim generation
     error ClaimGenerationFailed(bytes data);
-    error CannotRemoveOwnerAsRegistrar();
 
     /// @dev Structure to hold encrypted diploma data
     struct DiplomaData {
