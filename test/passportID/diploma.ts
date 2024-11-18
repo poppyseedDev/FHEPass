@@ -104,7 +104,7 @@ describe("PassportID and EmployerClaim Contracts", function () {
     biodata = bigIntToBytes64(8n),
     firstname = bigIntToBytes64(8n),
     lastname = bigIntToBytes64(8n),
-    birthdate = 1234n,
+    birthdate = 946681200n, // Sat Jan 01 2000 - 24 years old
   ) {
     const input = instance.createEncryptedInput(passportAddress, signer.address);
     const encryptedData = await input

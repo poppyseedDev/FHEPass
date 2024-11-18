@@ -13,8 +13,8 @@ import "@openzeppelin/contracts/access/Ownable2Step.sol";
  * @notice Allows generation and verification of encrypted claims for employment verification
  */
 contract EmployerClaim is Ownable2Step {
-    /// @dev Age threshold timestamp for adult verification (Jan 1, 2024 - 18 years)
-    uint64 private constant AGE_THRESHOLD_TIMESTAMP = 1704067200;
+    /// @dev Age threshold timestamp for adult verification (Jan 1, 2006 - 18 years on Jan 1, 2024)
+    uint64 private constant AGE_THRESHOLD_TIMESTAMP = 1136070000;
     /// @dev Required degree level for education verification (Computer Science (B.Sc))
     uint16 private constant REQUIRED_DEGREE_LEVEL = 3;
     /// @dev Constant representing an invalid claim ID
