@@ -6,6 +6,7 @@ import type { FhevmInstance } from "fhevmjs";
 import type { Diploma, EmployerClaim, IdMapping, PassportID } from "../../types";
 import { createInstances } from "../instance";
 import { getSigners, initSigners } from "../signers";
+import { bigIntToBytes64 } from "../utils";
 import { deployEmployerClaimFixture } from "./fixture/EmployerClaim.fixture";
 
 // Helper function to convert bigint to bytes
@@ -47,13 +48,18 @@ describe("PassportID and EmployerClaim Contracts", function () {
     instance: FhevmInstance,
     passportAddress: string,
     signer: HardhatEthersSigner,
-    biodata = 8,
-    firstname = 8,
-    lastname = 8,
+    biodata = bigIntToBytes64(8n),
+    firstname = bigIntToBytes64(8n),
+    lastname = bigIntToBytes64(8n),
     birthdate = 1234n,
   ) {
     const input = instance.createEncryptedInput(passportAddress, signer.address);
-    const encryptedData = await input.add8(biodata).add8(firstname).add8(lastname).add64(birthdate).encrypt();
+    const encryptedData = await input
+      .addBytes64(biodata)
+      .addBytes64(firstname)
+      .addBytes64(lastname)
+      .add64(birthdate)
+      .encrypt();
 
     await passportID
       .connect(signer)

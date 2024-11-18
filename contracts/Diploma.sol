@@ -27,9 +27,9 @@ contract Diploma is AccessControl {
     /// @dev Structure to hold encrypted diploma data
     struct DiplomaData {
         euint64 id; // Encrypted unique diploma ID
-        euint8 university; // Encrypted university identifier
-        euint8 degree; // Encrypted degree type
-        euint8 grade; // Encrypted grade
+        ebytes64 university; // Encrypted university identifier
+        euint16 degree; // Encrypted degree identifier
+        ebytes64 grade; // Encrypted grade
     }
 
     /// @dev Instance of IdMapping contract
@@ -39,6 +39,8 @@ contract Diploma is AccessControl {
     mapping(uint256 => DiplomaData) private diplomaRecords;
     /// @dev Mapping to track registered diplomas
     mapping(uint256 => bool) public registered;
+    /// @dev Mapping for degree identifiers to degree names
+    mapping(uint16 => string) public degreeTypes;
 
     /// @dev Event emitted when a diploma is registered
     event DiplomaRegistered(address indexed graduate);
@@ -54,6 +56,20 @@ contract Diploma is AccessControl {
         idMapping = IdMapping(_idMappingAddress);
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender); // Admin role for contract owner
         _grantRole(REGISTRAR_ROLE, msg.sender); // Registrar role for contract owner
+
+        // Initialize degree mappings
+        degreeTypes[1] = "Electrical Engineering (B.Eng)";
+        degreeTypes[2] = "Mechanical Engineering (B.Eng)";
+        degreeTypes[3] = "Computer Science (B.Sc)";
+        degreeTypes[4] = "Civil Engineering (B.Eng)";
+        degreeTypes[5] = "Chemical Engineering (B.Eng)";
+        // Graduate degrees start from 1001
+        degreeTypes[1001] = "Electrical Engineering (M.Eng)";
+        degreeTypes[1002] = "Mechanical Engineering (M.Eng)";
+        degreeTypes[1003] = "Computer Science (M.Sc)";
+        // Doctoral degrees start from 2001
+        degreeTypes[2001] = "Electrical Engineering (Ph.D)";
+        degreeTypes[2002] = "Computer Science (Ph.D)";
     }
 
     /**
@@ -70,6 +86,15 @@ contract Diploma is AccessControl {
      */
     function removeRegistrar(address registrar) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _revokeRole(REGISTRAR_ROLE, registrar);
+    }
+
+    /**
+     * @dev Retrieves the degree type for a given degree ID
+     * @param degreeId The ID of the degree type to retrieve
+     * @return The name/description of the degree type
+     */
+    function getDegreeType(uint16 degreeId) public view returns (string memory) {
+        return degreeTypes[degreeId];
     }
 
     /**
@@ -96,9 +121,9 @@ contract Diploma is AccessControl {
         // Store the encrypted diploma data
         diplomaRecords[userId] = DiplomaData({
             id: newId,
-            university: TFHE.asEuint8(university, inputProof),
-            degree: TFHE.asEuint8(degree, inputProof),
-            grade: TFHE.asEuint8(grade, inputProof)
+            university: TFHE.asEbytes64(university, inputProof),
+            degree: TFHE.asEuint16(degree, inputProof),
+            grade: TFHE.asEbytes64(grade, inputProof)
         });
 
         registered[userId] = true; // Mark the diploma as registered
@@ -128,7 +153,7 @@ contract Diploma is AccessControl {
      * @param userId ID of the user to get university for
      * @return euint8 Encrypted university identifier
      */
-    function getMyUniversity(uint256 userId) public view virtual returns (euint8) {
+    function getMyUniversity(uint256 userId) public view virtual returns (ebytes64) {
         if (!registered[userId]) revert DiplomaNotRegistered();
         return diplomaRecords[userId].university;
     }
@@ -138,7 +163,7 @@ contract Diploma is AccessControl {
      * @param userId ID of the user to get degree for
      * @return euint8 Encrypted degree type
      */
-    function getMyDegree(uint256 userId) public view virtual returns (euint8) {
+    function getMyDegree(uint256 userId) public view virtual returns (euint16) {
         if (!registered[userId]) revert DiplomaNotRegistered();
         return diplomaRecords[userId].degree;
     }
@@ -148,7 +173,7 @@ contract Diploma is AccessControl {
      * @param userId ID of the user to get grade for
      * @return euint8 Encrypted grade
      */
-    function getMyGrade(uint256 userId) public view virtual returns (euint8) {
+    function getMyGrade(uint256 userId) public view virtual returns (ebytes64) {
         if (!registered[userId]) revert DiplomaNotRegistered();
         return diplomaRecords[userId].grade;
     }
