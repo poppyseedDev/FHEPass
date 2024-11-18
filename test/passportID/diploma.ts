@@ -171,7 +171,7 @@ describe("PassportID and EmployerClaim Contracts", function () {
 
     const tx = await diplomaID
       .connect(this.signers.alice)
-      .generateClaim(this.employerClaimAddress, "generateDegreeClaim(uint256,address)");
+      .generateClaim(this.employerClaimAddress, "generateDegreeClaim(uint256)");
 
     await expect(tx).to.emit(employerClaim, "DegreeClaimGenerated");
 
@@ -205,7 +205,7 @@ describe("PassportID and EmployerClaim Contracts", function () {
 
     const degreeTx = await diplomaID
       .connect(this.signers.alice)
-      .generateClaim(this.employerClaimAddress, "generateDegreeClaim(uint256,address)");
+      .generateClaim(this.employerClaimAddress, "generateDegreeClaim(uint256)");
 
     await expect(degreeTx).to.emit(employerClaim, "DegreeClaimGenerated");
 
@@ -216,7 +216,7 @@ describe("PassportID and EmployerClaim Contracts", function () {
 
     const adultTx = await passportID
       .connect(this.signers.alice)
-      .generateClaim(this.employerClaimAddress, "generateAdultClaim(uint256,address)");
+      .generateClaim(this.employerClaimAddress, "generateAdultClaim(uint256)");
 
     await expect(adultTx).to.emit(employerClaim, "AdultClaimGenerated");
 

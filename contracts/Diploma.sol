@@ -139,7 +139,7 @@ contract Diploma is AccessControl {
         if (!TFHE.isSenderAllowed(diplomaRecords[userId].degree)) revert AccessNotPermitted();
 
         // Attempt the external call and capture the result
-        (bool success, bytes memory data) = claimAddress.call(abi.encodeWithSignature(claimFn, userId, address(this)));
+        (bool success, bytes memory data) = claimAddress.call(abi.encodeWithSignature(claimFn, userId));
         if (!success) revert ClaimGenerationFailed(data);
 
         emit ClaimGenerated(msg.sender, claimAddress, claimFn); // Emit event for claim generation

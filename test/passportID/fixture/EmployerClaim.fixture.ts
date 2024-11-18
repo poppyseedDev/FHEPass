@@ -15,7 +15,7 @@ export async function deployEmployerClaimFixture(): Promise<{
   const passportID = await deployPassportIDFixture(idMapping);
   const diploma = await deployDiplomaFixture(idMapping);
   const EmployerClaimFactory = await ethers.getContractFactory("EmployerClaim");
-  const employerClaim = await EmployerClaimFactory.deploy(idMapping);
+  const employerClaim = await EmployerClaimFactory.deploy(idMapping, passportID, diploma);
   await employerClaim.waitForDeployment();
   return { employerClaim, passportID, diploma, idMapping };
 }

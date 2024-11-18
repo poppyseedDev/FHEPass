@@ -35,24 +35,29 @@ contract EmployerClaim is Ownable2Step {
 
     // Instance of IdMapping contract
     IdMapping private idMapping;
+    PassportID private passportContract;
+    Diploma private diplomaContract;
 
     // Constructor to initialize the contract with IdMapping address
-    constructor(address _idMappingAddress) Ownable(msg.sender) {
+    constructor(address _idMappingAddress, address _passportAddress, address _diplomaAddress) Ownable(msg.sender) {
         TFHE.setFHEVM(FHEVMConfig.defaultConfig());
-        if (_idMappingAddress == address(0)) revert InvalidContractAddress();
+        if (_idMappingAddress == address(0) || _passportAddress == address(0) || _diplomaAddress == address(0))
+            revert InvalidContractAddress();
+
         idMapping = IdMapping(_idMappingAddress);
+        passportContract = PassportID(_passportAddress);
+        diplomaContract = Diploma(_diplomaAddress);
     }
 
     // Generate an age claim to verify if a user is above a certain age (e.g., 18)
-    function generateAdultClaim(uint256 userId, address _passportContract) public returns (uint64) {
-        if (_passportContract == address(0)) revert InvalidContractAddress();
+    function generateAdultClaim(uint256 userId) public returns (uint64) {
         if (userId == INVALID_ID) revert InvalidUserId();
 
         // Retrieve the address associated with the user ID
         address addressToBeAllowed = idMapping.getAddr(userId);
 
         // Retrieve the user's encrypted birthdate from the PassportID contract
-        euint64 birthdate = PassportID(_passportContract).getBirthdate(userId);
+        euint64 birthdate = passportContract.getBirthdate(userId);
 
         // Set age threshold to 18 years (in Unix timestamp)
         euint64 ageThreshold = TFHE.asEuint64(AGE_THRESHOLD_TIMESTAMP);
@@ -82,15 +87,14 @@ contract EmployerClaim is Ownable2Step {
     }
 
     // Generate a claim to verify if a user has a specific degree from a specific university
-    function generateDegreeClaim(uint256 userId, address _diplomaContract) public returns (uint64) {
-        if (_diplomaContract == address(0)) revert InvalidContractAddress();
+    function generateDegreeClaim(uint256 userId) public returns (uint64) {
         if (userId == INVALID_ID) revert InvalidUserId();
 
         // Retrieve the address associated with the user ID
         address addressToBeAllowed = idMapping.getAddr(userId);
 
         // Get the diploma data from the Diploma contract
-        euint8 userUniversity = Diploma(_diplomaContract).getMyDegree(userId);
+        euint8 userUniversity = diplomaContract.getMyDegree(userId);
 
         lastClaimId++;
 

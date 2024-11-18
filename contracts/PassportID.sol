@@ -142,7 +142,7 @@ contract PassportID is AccessControl {
         if (!TFHE.isSenderAllowed(citizenIdentities[userId].birthdate)) revert AccessNotPermitted();
 
         // Attempt the external call and capture the result
-        (bool success, bytes memory data) = claimAddress.call(abi.encodeWithSignature(claimFn, userId, address(this)));
+        (bool success, bytes memory data) = claimAddress.call(abi.encodeWithSignature(claimFn, userId));
         if (!success) revert ClaimGenerationFailed(data);
     }
 }

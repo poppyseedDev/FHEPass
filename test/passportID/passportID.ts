@@ -134,7 +134,7 @@ describe("PassportID and EmployerClaim Contracts", function () {
 
     const tx = await passportID
       .connect(this.signers.alice)
-      .generateClaim(this.employerClaimAddress, "generateAdultClaim(uint256,address)");
+      .generateClaim(this.employerClaimAddress, "generateAdultClaim(uint256)");
 
     await expect(tx).to.emit(employerClaim, "AdultClaimGenerated");
 
