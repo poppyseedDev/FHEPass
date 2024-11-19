@@ -282,4 +282,94 @@ describe("PassportID and EmployerClaim Contracts", function () {
 
     expect(reencryptedVerifyResult).to.equal(1);
   });
+
+  it("should not allow generating claims without a registered ID", async function () {
+    // Try to generate degree claim without registering ID first
+    await expect(
+      diplomaID.connect(this.signers.alice).generateClaim(this.employerClaimAddress, "generateDegreeClaim(uint256)"),
+    ).to.be.revertedWithCustomError(idMapping, "NoIdGenerated");
+
+    // Try to generate adult claim without registering ID first
+    await expect(
+      passportID.connect(this.signers.alice).generateClaim(this.employerClaimAddress, "generateAdultClaim(uint256)"),
+    ).to.be.revertedWithCustomError(idMapping, "NoIdGenerated");
+  });
+
+  it("should not allow generating claims with unregistered diploma/identity", async function () {
+    // Generate ID but don't register diploma/identity
+    await idMapping.connect(this.signers.alice).generateId();
+    const userId = await idMapping.getId(this.signers.alice);
+
+    // Try to generate degree claim without registering diploma
+    await expect(
+      diplomaID.connect(this.signers.alice).generateClaim(this.employerClaimAddress, "generateDegreeClaim(uint256)"),
+    ).to.be.revertedWith("sender isn't allowed");
+
+    // Try to generate adult claim without registering identity
+    await expect(
+      passportID.connect(this.signers.alice).generateClaim(this.employerClaimAddress, "generateAdultClaim(uint256)"),
+    ).to.be.revertedWith("sender isn't allowed");
+  });
+
+  it("should allow admin to add a new registrar for diplomaID and passportID", async function () {
+    // Test diplomaID
+    await expect(diplomaID.connect(this.signers.alice).addRegistrar(this.signers.bob.address))
+      .to.emit(diplomaID, "RoleGranted")
+      .withArgs(await diplomaID.REGISTRAR_ROLE(), this.signers.bob.address, this.signers.alice.address);
+
+    expect(await diplomaID.hasRole(await diplomaID.REGISTRAR_ROLE(), this.signers.bob.address)).to.be.true;
+
+    // Test passportID
+    await expect(passportID.connect(this.signers.alice).addRegistrar(this.signers.bob.address))
+      .to.emit(passportID, "RoleGranted")
+      .withArgs(await passportID.REGISTRAR_ROLE(), this.signers.bob.address, this.signers.alice.address);
+
+    expect(await passportID.hasRole(await passportID.REGISTRAR_ROLE(), this.signers.bob.address)).to.be.true;
+  });
+
+  it("should allow admin to remove a registrar from diplomaID and passportID", async function () {
+    // Test diplomaID
+    await diplomaID.connect(this.signers.alice).addRegistrar(this.signers.bob.address);
+    await expect(diplomaID.connect(this.signers.alice).removeRegistrar(this.signers.bob.address))
+      .to.emit(diplomaID, "RoleRevoked")
+      .withArgs(await diplomaID.REGISTRAR_ROLE(), this.signers.bob.address, this.signers.alice.address);
+
+    expect(await diplomaID.hasRole(await diplomaID.REGISTRAR_ROLE(), this.signers.bob.address)).to.be.false;
+
+    // Test passportID
+    await passportID.connect(this.signers.alice).addRegistrar(this.signers.bob.address);
+    await expect(passportID.connect(this.signers.alice).removeRegistrar(this.signers.bob.address))
+      .to.emit(passportID, "RoleRevoked")
+      .withArgs(await passportID.REGISTRAR_ROLE(), this.signers.bob.address, this.signers.alice.address);
+
+    expect(await passportID.hasRole(await passportID.REGISTRAR_ROLE(), this.signers.bob.address)).to.be.false;
+  });
+
+  it("should not allow non-admin to add a registrar to diplomaID and passportID", async function () {
+    // Test diplomaID
+    await expect(
+      diplomaID.connect(this.signers.carol).addRegistrar(this.signers.carol.address),
+    ).to.be.revertedWithCustomError(diplomaID, "AccessControlUnauthorizedAccount");
+
+    // Test passportID
+    await expect(
+      passportID.connect(this.signers.carol).addRegistrar(this.signers.carol.address),
+    ).to.be.revertedWithCustomError(passportID, "AccessControlUnauthorizedAccount");
+  });
+
+  it("should not allow non-admin to remove a registrar from diplomaID and passportID", async function () {
+    // Test diplomaID
+    await diplomaID.connect(this.signers.alice).addRegistrar(this.signers.bob.address);
+    await expect(
+      diplomaID.connect(this.signers.carol).removeRegistrar(this.signers.bob.address),
+    ).to.be.revertedWithCustomError(diplomaID, "AccessControlUnauthorizedAccount");
+    await diplomaID.connect(this.signers.alice).removeRegistrar(this.signers.bob.address);
+
+    // Test passportID
+    await passportID.connect(this.signers.alice).addRegistrar(this.signers.bob.address);
+    await expect(
+      passportID.connect(this.signers.carol).removeRegistrar(this.signers.bob.address),
+    ).to.be.revertedWithCustomError(passportID, "AccessControlUnauthorizedAccount");
+    await passportID.connect(this.signers.alice).removeRegistrar(this.signers.bob.address);
+  });
 });

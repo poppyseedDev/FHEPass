@@ -14,6 +14,7 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 contract PassportID is AccessControl {
     /// @dev Constants
     bytes32 public constant REGISTRAR_ROLE = keccak256("REGISTRAR_ROLE");
+    bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
 
     /// @dev Custom errors
     /// @notice Thrown when attempting to register an identity for a user who already has one
@@ -61,7 +62,7 @@ contract PassportID is AccessControl {
     constructor(address _idMappingAddress) {
         TFHE.setFHEVM(FHEVMConfig.defaultConfig());
         idMapping = IdMapping(_idMappingAddress);
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender); /// @dev Admin role for contract owner
+        _grantRole(OWNER_ROLE, msg.sender); /// @dev Admin role for contract owner
         _grantRole(REGISTRAR_ROLE, msg.sender); /// @dev Registrar role for contract owner
     }
 
@@ -70,7 +71,7 @@ contract PassportID is AccessControl {
      * @dev Only callable by admin role
      * @param registrar Address to be granted registrar permissions
      */
-    function addRegistrar(address registrar) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function addRegistrar(address registrar) external onlyRole(OWNER_ROLE) {
         _grantRole(REGISTRAR_ROLE, registrar);
     }
 
@@ -79,7 +80,7 @@ contract PassportID is AccessControl {
      * @dev Only callable by admin role
      * @param registrar Address to have registrar permissions revoked
      */
-    function removeRegistrar(address registrar) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function removeRegistrar(address registrar) external onlyRole(OWNER_ROLE) {
         _revokeRole(REGISTRAR_ROLE, registrar);
     }
 
@@ -102,7 +103,7 @@ contract PassportID is AccessControl {
         einput lastname,
         einput birthdate,
         bytes calldata inputProof
-    ) public virtual onlyRole(DEFAULT_ADMIN_ROLE) returns (bool) {
+    ) public virtual onlyRole(REGISTRAR_ROLE) returns (bool) {
         if (registered[userId]) revert AlreadyRegistered();
 
         /// @dev Generate a new encrypted unique ID

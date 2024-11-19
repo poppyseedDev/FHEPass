@@ -14,6 +14,7 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 contract Diploma is AccessControl {
     /// @dev Constants
     bytes32 public constant REGISTRAR_ROLE = keccak256("REGISTRAR_ROLE");
+    bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
 
     /// @dev Custom errors
     /// @notice Thrown when attempting to register a diploma for a user who already has one
@@ -56,7 +57,7 @@ contract Diploma is AccessControl {
     constructor(address _idMappingAddress) {
         TFHE.setFHEVM(FHEVMConfig.defaultConfig()); // Set up the FHEVM configuration for this contract
         idMapping = IdMapping(_idMappingAddress);
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender); // Admin role for contract owner
+        _grantRole(OWNER_ROLE, msg.sender); // Admin role for contract owner
         _grantRole(REGISTRAR_ROLE, msg.sender); // Registrar role for contract owner
 
         // Initialize degree mappings
@@ -78,7 +79,7 @@ contract Diploma is AccessControl {
      * @dev Adds a new registrar address
      * @param registrar Address to be granted registrar role
      */
-    function addRegistrar(address registrar) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function addRegistrar(address registrar) external onlyRole(OWNER_ROLE) {
         _grantRole(REGISTRAR_ROLE, registrar);
     }
 
@@ -86,7 +87,7 @@ contract Diploma is AccessControl {
      * @dev Removes a registrar address
      * @param registrar Address to be revoked registrar role
      */
-    function removeRegistrar(address registrar) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function removeRegistrar(address registrar) external onlyRole(OWNER_ROLE) {
         _revokeRole(REGISTRAR_ROLE, registrar);
     }
 
@@ -114,7 +115,7 @@ contract Diploma is AccessControl {
         einput degree,
         einput grade,
         bytes calldata inputProof
-    ) public virtual onlyRole(DEFAULT_ADMIN_ROLE) returns (bool) {
+    ) public virtual onlyRole(REGISTRAR_ROLE) returns (bool) {
         if (registered[userId]) revert DiplomaAlreadyRegistered();
 
         // Generate a new encrypted diploma ID
