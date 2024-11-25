@@ -32,11 +32,11 @@ contract EmployerClaim is Ownable2Step {
     /// @dev Counter for tracking the latest claim ID
     uint64 public lastClaimId = 0;
     /// @dev Mapping of claim IDs to encrypted boolean results for adult claims
-    mapping(uint64 => ebool) public adultClaims;
+    mapping(uint64 => ebool) private adultClaims;
     /// @dev Mapping of claim IDs to encrypted boolean results for degree claims
-    mapping(uint64 => ebool) public degreeClaims;
+    mapping(uint64 => ebool) private degreeClaims;
     /// @dev Mapping of user IDs to encrypted boolean results for verified claims
-    mapping(uint256 => ebool) public verifiedClaims;
+    mapping(uint256 => ebool) private verifiedClaims;
 
     /// @dev Emitted when an adult claim is generated
     /// @param claimId The ID of the generated claim
@@ -105,7 +105,7 @@ contract EmployerClaim is Ownable2Step {
         adultClaims[lastClaimId] = isAdult;
 
         /// Grant access to the claim to both the contract and user for verification purposes
-        TFHE.allow(isAdult, address(this));
+        TFHE.allowThis(isAdult);
         TFHE.allow(isAdult, addressToBeAllowed);
 
         /// Emit an event for the generated claim
@@ -150,7 +150,7 @@ contract EmployerClaim is Ownable2Step {
         degreeClaims[lastClaimId] = degreeMatch;
 
         /// Grant access to the claim
-        TFHE.allow(degreeMatch, address(this));
+        TFHE.allowThis(degreeMatch);
         TFHE.allow(degreeMatch, addressToBeAllowed);
 
         /// Emit an event for the generated claim
@@ -190,12 +190,9 @@ contract EmployerClaim is Ownable2Step {
         /// Store the verification result under the userId mapping
         verifiedClaims[userId] = verify;
 
-        /// Retrieve the address associated with the user ID
-        address addressToBeAllowed = idMapping.getAddr(userId);
-
         /// Grant access to the claim
-        TFHE.allow(verify, address(this));
-        TFHE.allow(verify, addressToBeAllowed);
+        TFHE.allowThis(verify);
+        TFHE.allow(verify, owner());
     }
 
     /**

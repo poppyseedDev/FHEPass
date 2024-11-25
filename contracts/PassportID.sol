@@ -131,11 +131,11 @@ contract PassportID is AccessControl {
         TFHE.allow(citizenIdentities[userId].birthdate, addressToBeAllowed);
 
         /// @dev Allow the contract to access the data
-        TFHE.allow(citizenIdentities[userId].id, address(this));
-        TFHE.allow(citizenIdentities[userId].biodata, address(this));
-        TFHE.allow(citizenIdentities[userId].firstname, address(this));
-        TFHE.allow(citizenIdentities[userId].lastname, address(this));
-        TFHE.allow(citizenIdentities[userId].birthdate, address(this));
+        TFHE.allowThis(citizenIdentities[userId].id);
+        TFHE.allowThis(citizenIdentities[userId].biodata);
+        TFHE.allowThis(citizenIdentities[userId].firstname);
+        TFHE.allowThis(citizenIdentities[userId].lastname);
+        TFHE.allowThis(citizenIdentities[userId].birthdate);
 
         emit IdentityRegistered(addressToBeAllowed); /// @dev Emit event for identity registration
 

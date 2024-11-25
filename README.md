@@ -83,13 +83,12 @@ The DID contract manages core identity data and allows the creation of encrypted
 
 ```solidity
 contract PassportID is AccessControl {
-  // Structure to hold encrypted identity data
   struct Identity {
-      euint64 id; // Encrypted unique ID
-      euint8 biodata; // Encrypted biodata (e.g., biometric data or hashed identity data)
-      euint8 firstname; // Encrypted first name
-      euint8 lastname; // Encrypted last name
-      euint64 birthdate; // Encrypted birthdate for age verification
+      euint64 id; /// @dev Encrypted unique ID
+      ebytes64 biodata; /// @dev Encrypted biodata (e.g., biometric data or hashed identity data)
+      ebytes64 firstname; /// @dev Encrypted first name
+      ebytes64 lastname; /// @dev Encrypted last name
+      euint64 birthdate; /// @dev Encrypted birthdate for age verification
   }
 
   // Mapping to store identities by user ID
@@ -139,7 +138,7 @@ contract EmployerClaim is Ownable2Step {
   // ...
 
   // Mapping of claim IDs to boolean results for adult claims
-  mapping(uint64 => ebool) public adultClaims;
+  mapping(uint64 => ebool) private adultClaims;
 
   // ...
 
@@ -174,7 +173,7 @@ contract EmployerClaim is Ownable2Step {
       adultClaims[lastClaimId] = isAdult;
 
       // Grant access to the claim to both the contract and user for verification purposes
-      TFHE.allow(isAdult, address(this));
+      TFHE.allowThis(isAdult);
       TFHE.allow(isAdult, addressToBeAllowed);
 
       // Emit an event for the generated claim

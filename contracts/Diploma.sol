@@ -141,10 +141,10 @@ contract Diploma is AccessControl {
         TFHE.allow(diplomaRecords[userId].grade, addressToBeAllowed);
 
         // Allow the contract to access the data
-        TFHE.allow(diplomaRecords[userId].id, address(this));
-        TFHE.allow(diplomaRecords[userId].university, address(this));
-        TFHE.allow(diplomaRecords[userId].degree, address(this));
-        TFHE.allow(diplomaRecords[userId].grade, address(this));
+        TFHE.allowThis(diplomaRecords[userId].id);
+        TFHE.allowThis(diplomaRecords[userId].university);
+        TFHE.allowThis(diplomaRecords[userId].degree);
+        TFHE.allowThis(diplomaRecords[userId].grade);
 
         emit DiplomaRegistered(addressToBeAllowed); // Emit event for diploma registration
 
